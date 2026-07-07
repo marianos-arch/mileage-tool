@@ -4,3 +4,4 @@ pandas
 openpyxl
 Pillow
 st-gsheets-connection
+streamlit-searchbox requests
