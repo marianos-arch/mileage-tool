@@ -8,9 +8,11 @@ from streamlit_searchbox import st_searchbox # pip install streamlit-searchbox
 st.set_page_config(page_title="Company Mileage Tracker", layout="wide")
 
 # --- API KEY MANAGEMENT ---
-# Priority: 1. Sidebar/UI Input (for debugging) -> 2. Hardcoded string fallback
 if "api_key" not in st.session_state:
-    st.session_state.api_key = "YOUR_API_KEY"  # Replace this with your default key if desired
+    if "GOOGLE_MAPS_API_KEY" in st.secrets:
+        st.session_state.api_key = st.secrets["GOOGLE_MAPS_API_KEY"]
+    else:
+        st.session_state.api_key = "YOUR_API_KEY"  # Fallback placeholder
 
 # --- API VALIDATION FUNCTION ---
 @st.cache_data(show_spinner=False)
