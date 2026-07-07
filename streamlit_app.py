@@ -272,3 +272,109 @@ if not st.session_state.mileage_data.empty:
         st.code(f"[Google Map Route Preview]\nFrom: {origin}\nTo: {destination}\nCalculated Form Distance: {trip_miles} miles")
 else:
     st.write("Add an entry above to generate the live map route.")
+
+
+import streamlit as st
+import pandas as pd
+import datetime
+import googlemaps
+
+# ... [Keep your Page Config, Secrets management, and Autocomplete functions the same] ...
+
+# --- NEW: GOOGLE DISTANCE MATRIX API FETCH ---
+def get_google_distance_miles(origin, destination):
+    """Calls Google API to get actual driving distance in miles."""
+    if not gmaps:
+        return 0.0
+    try:
+        # Call the distance matrix API for driving
+        matrix_result = gmaps.distance_matrix(origin, destination, mode="driving")
+        element = matrix_result['rows'][0]['elements'][0]
+        
+        if element['status'] == 'OK':
+            # Distance returns in meters, convert meters to miles
+            meters = element['distance']['value']
+            miles = meters * 0.000621371
+            return round(miles, 1)
+        else:
+            st.error(f"Google couldn't calculate a route: {element['status']}")
+            return 0.0
+    except Exception as e:
+        st.error(f"Error calling Distance Matrix API: {e}")
+        return 0.0
+
+# --- SECTION 2: USER INPUT FORM (UPDATED) ---
+st.header("📍 Add New Journey")
+
+col_date, col_start, col_dest = st.columns(3)
+with col_date:
+    travel_date = st.date_input("Date", value=today)
+with col_start:
+    st.write("**Starting Location**")
+    # [Your st_searchbox Autocomplete setup here...]
+with col_dest:
+    st.write("**Destination**")
+    # [Your st_searchbox Autocomplete setup here...]
+
+col_purpose, col_rt = st.columns([3, 1])
+with col_purpose:
+    purpose = st.text_input("Purpose of Travel")
+with col_rt:
+    round_trip = st.selectbox("Round Trip?", ["No", "Yes"])
+
+# --- ODOMETER INTERACTION BLOCK ---
+st.markdown("##### 🚗 Odometer Sync Settings")
+st.write("Provide *either* Start or End. The tool checks Google Maps and dynamically fills the missing value.")
+
+col_odo_start, col_odo_end = st.columns(2)
+with col_odo_start:
+    # Use value=0 but let it accept empty blanks by switching to clearable inputs or text inputs
+    odo_start_input = st.text_input("Odometer Start", value="", placeholder="e.g., 45100")
+with col_odo_end:
+    odo_end_input = st.text_input("Odometer End", value="", placeholder="e.g., 45125")
+
+submit_button = st.button("Calculate & Add Entry", type="primary")
+
+# --- FORM LOGIC ---
+if submit_button:
+    if not start_loc or not dest_loc:
+        st.error("Error: Please provide both a Starting Location and Destination.")
+    else:
+        # 1. Fetch exact route distance from Google Maps
+        google_miles = get_google_distance_miles(start_loc, dest_loc)
+        
+        # Double the miles if round trip flag is checked
+        calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles
+        
+        # 2. Convert Odometer fields safely to integers if provided
+        o_start = int(odo_start_input) if odo_start_input.strip().isdigit() else None
+        o_end = int(odo_end_input) if odo_end_input.strip().isdigit() else None
+        
+        # 3. Smart Odometer Autocompletion Logic
+        if o_start is not None and o_end is None:
+            o_end = int(o_start + calculated_miles)
+        elif o_end is not None and o_start is None:
+            o_start = int(o_end - calculated_miles)
+        elif o_start is not None and o_end is not None:
+            # Overwrite calculated miles if both entries are manually filled out
+            calculated_miles = o_end - o_start
+        else:
+            # Both were left blank
+            o_start, o_end = 0, int(calculated_miles)
+
+        # 4. Save entry to DataFrame
+        new_entry = {
+            "Date": travel_date.strftime("%Y-%m-%d"),
+            "Starting Location": start_loc,
+            "Destination": dest_loc,
+            "Round Trip": round_trip,
+            "Purpose of Travel": purpose,
+            "Odometer Start": o_start,
+            "Odometer End": o_end,
+            "Calculated Mileage": calculated_miles
+        }
+        st.session_state.mileage_data = pd.concat([st.session_state.mileage_data, pd.DataFrame([new_entry])], ignore_index=True)
+        st.success(f"Added! Google Route Distance: {google_miles} miles calculated.")
+        st.rerun()
+
+
