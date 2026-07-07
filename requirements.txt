@@ -5,3 +5,4 @@ openpyxl
 Pillow
 st-gsheets-connection
 streamlit-searchbox
+googlemaps
