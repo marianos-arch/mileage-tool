@@ -230,3 +230,45 @@ if not st.session_state.mileage_data.empty:
         st.code(f"[Google Map Route Preview]\nFrom: {origin}\nTo: {destination}")
 else:
     st.write("Add an entry above to generate the map route.")
+
+# --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION ---
+st.header("🗺️ Route Map & Print View")
+
+if not st.session_state.mileage_data.empty:
+    # 1. Grab the most recent entry from the DataFrame
+    last_entry = st.session_state.mileage_data.iloc[-1]
+    origin = last_entry["Starting Location"]
+    destination = last_entry["Destination"]
+    trip_miles = last_entry["Calculated Mileage"]
+    
+    # 2. Display summary metrics right above the route map
+    st.subheader(f"Current Route Detail")
+    col_m1, col_m2 = st.columns(2)
+    col_m1.metric("Route Leg", f"{origin} ➡️ {destination}")
+    col_m2.metric("Odometer Calculated Distance", f"{trip_miles} miles")
+    
+    if st.button("🖨️ Open Clean Print View"):
+        st.warning("Press Ctrl+P (or Cmd+P on Mac) to print this layout configuration.")
+    
+    # 3. Render map via Google Maps Embed API using 'directions' mode
+    if api_status == "Valid":
+        # Format strings cleanly into standard URL-encoded parameters
+        formatted_origin = origin.replace(" ", "+")
+        formatted_destination = destination.replace(" ", "+")
+        
+        # Proper Embed API syntax for directions mode
+        map_url = (
+            f"https://www.google.com/maps/embed/v1/directions"
+            f"?key={st.session_state.api_key}"
+            f"&origin={formatted_origin}"
+            f"&destination={formatted_destination}"
+            f"&mode=driving"
+        )
+        
+        # Display the interactive map layout container
+        st.components.v1.iframe(map_url, width=900, height=500)
+    else:
+        st.info("🔄 Map streaming paused because the API status is currently offline or invalid.")
+        st.code(f"[Google Map Route Preview]\nFrom: {origin}\nTo: {destination}\nCalculated Form Distance: {trip_miles} miles")
+else:
+    st.write("Add an entry above to generate the live map route.")
