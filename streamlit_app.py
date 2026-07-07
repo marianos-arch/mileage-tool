@@ -3,12 +3,10 @@ import pandas as pd
 import requests
 from datetime import datetime
 import io
-from streamlit_searchbox import st_searchbox
 
 st.set_page_config(page_title="Live Mileage Tracker", page_icon="🚗", layout="wide")
 
-st.title("🚗 Smart Mileage Tracker (Autocomplete Ready)")
-st.caption("Now with live typing predictions powered by Google Places API.")
+st.title("🚗 Smart Mileage Tracker (Debug Mode)")
 
 # --- Fetch Secure API Key ---
 try:
@@ -17,118 +15,67 @@ except Exception:
     st.error("🔑 Google Maps API Key not found! Please check your `.streamlit/secrets.toml` file.")
     st.stop()
 
-# --- Live Google Places Autocomplete Function ---
-def search_google_places(search_term: str):
-    """Triggers on keystroke to fetch matching addresses from Google."""
-    if not search_term or len(search_term) < 3:  # Only look up after 3 characters to save API credits
+# --- Custom Search Logic ---
+def get_predictions(text_input):
+    if not text_input or len(text_input) < 3:
         return []
     
-    # Restricting results to US components to make lookups more accurate
-    url = f"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={search_term}&key={API_KEY}&components=country:us"
+    url = f"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={text_input}&key={API_KEY}&components=country:us"
     try:
-        response = requests.get(url).json()
-        options = [prediction["description"] for prediction in response.get("predictions", [])]
-        return options
-    except Exception:
+        res = requests.get(url)
+        data = res.json()
+        
+        # If Google rejects it, print the exact reason to screen
+        if data.get("status") not in ["OK", "ZERO_RESULTS"]:
+            st.error(f"Google API Error Status: {data.get('status')} - {data.get('error_message', 'No message detailed')}")
+            return []
+            
+        return [pred["description"] for pred in data.get("predictions", [])]
+    except Exception as e:
+        st.error(f"Network error: {e}")
         return []
 
-# --- Live Google Distance Calculation ---
 def get_live_distance(origin, destination):
-    """Queries Google Distance Matrix API for exact driving miles."""
     url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origin}&destinations={destination}&units=imperial&key={API_KEY}"
     try:
         response = requests.get(url).json()
         if response["status"] == "OK":
             element = response["rows"][0]["elements"][0]
             if element["status"] == "OK":
-                meters = element["distance"]["value"]
-                miles = meters * 0.000621371
-                return round(miles, 1)
+                return round(element["distance"]["value"] * 0.000621371, 1)
         return None
     except Exception:
         return None
-
-# --- Sidebar: Document Upload ---
-with st.sidebar:
-    st.header("1. Upload Template")
-    uploaded_file = st.file_uploader("Upload your mileage_template.xlsx", type=["xlsx"])
 
 # --- Main Interface ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.header("2. Trip Information")
-    date_selected = st.date_input("Date of Travel", datetime.now())
+    st.header("1. Enter Trip Info")
     
-    # 🌟 NEW: Live Google Places Autocomplete Searchboxes
-    st.markdown("**From (Origin Address)**")
-    from_address = st_searchbox(
-        search_google_places,
-        key="origin_search",
-        placeholder="Start typing origin address..."
-    )
-    
-    st.markdown("**To (Destination Address)**")
-    to_address = st_searchbox(
-        search_google_places,
-        key="destination_search",
-        placeholder="Start typing destination address..."
-    )
-    
-    purpose = st.text_area("Purpose of Travel", placeholder="e.g., Client meeting regarding project setup")
+    # --- From Address block ---
+    from_raw = st.text_input("Type Origin Address (Type at least 3 letters):", key="from_raw")
+    from_options = get_predictions(from_raw)
+    from_address = st.selectbox("Confirm Origin Selection:", ["-- Select a verified address --"] + from_options, key="from_select")
+
+    st.markdown("---")
+
+    # --- To Address block ---
+    to_raw = st.text_input("Type Destination Address (Type at least 3 letters):", key="to_raw")
+    to_options = get_predictions(to_raw)
+    to_address = st.selectbox("Confirm Destination Selection:", ["-- Select a verified address --"] + to_options, key="to_select")
+
+    purpose = st.text_area("Purpose of Travel")
 
 with col2:
-    st.header("3. Route & Calculations")
+    st.header("2. Route Calculation")
     
-    if from_address and to_address:
-        with st.spinner("Calculating live route constraints..."):
-            calculated_miles = get_live_distance(from_address, to_address)
-        
-        if calculated_miles is not None:
-            st.metric(label="Official Google Maps Distance", value=f"{calculated_miles} miles")
-            
-            # Static Map Preview Generation
-            st.subheader("Route Map Preview")
+    # Only calculate if a valid choice was picked from both dropdown confirmations
+    if from_address != "-- Select a verified address --" and to_address != "-- Select a verified address --":
+        miles = get_live_distance(from_address, to_address)
+        if miles:
+            st.metric("Total Mileage", f"{miles} miles")
             static_map_url = f"https://maps.googleapis.com/maps/api/staticmap?size=600x300&markers=color:red|label:A|{from_address}&markers=color:blue|label:B|{to_address}&key={API_KEY}"
-            st.image(static_map_url, caption="Live Route Bounds")
+            st.image(static_map_url)
         else:
-            st.error("Could not calculate distance. Please check the address format.")
-    else:
-        st.info("Start typing and select full addresses to ping Google Maps APIs.")
-
-st.divider()
-
-# --- Processing & Excel Generation ---
-st.header("4. Generate Report")
-
-if uploaded_file is not None:
-    if from_address and to_address and purpose and 'calculated_miles' in locals() and calculated_miles is not None:
-        if st.button("🚀 Process & Update Sheet", type="primary"):
-            df = pd.read_excel(uploaded_file)
-            
-            new_data = {
-                "Date": [date_selected.strftime("%Y-%m-%d")],
-                "Purpose of Travel": [purpose],
-                "From": [from_address],
-                "To": [to_address],
-                "Miles": [calculated_miles]
-            }
-            
-            updated_df = pd.concat([df, pd.DataFrame(new_data)], ignore_index=True)
-            
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                updated_df.to_excel(writer, index=False)
-            buffer.seek(0)
-            
-            st.success("🎉 Data accurately compiled into your template layout!")
-            st.download_button(
-                label="📥 Download Updated Mileage Sheet",
-                data=buffer,
-                file_name=f"updated_mileage_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-    else:
-        st.warning("Please fully select search predictions and enter trip details to compile the output.")
-else:
-    st.info("Please upload your baseline tracking Excel template file in the sidebar to proceed.")
+            st.warning("Could not calculate distance between these exact items.")
