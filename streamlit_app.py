@@ -302,25 +302,42 @@ def get_google_distance_miles(origin, destination):
     except Exception as e:
         st.error(f"Error calling Distance Matrix API: {e}")
         return 0.0
-
-# --- SECTION 2: USER INPUT FORM (UPDATED) ---
+        
+# --- SECTION 2: USER INPUT FORM (UPDATED WITH UNIQUE KEYS) ---
 st.header("📍 Add New Journey")
 
 col_date, col_start, col_dest = st.columns(3)
 with col_date:
-    travel_date = st.date_input("Date", value=today)
+    # Explicit key added here to fix the crash
+    travel_date = st.date_input("Date", value=today, key="journey_travel_date")
+
 with col_start:
     st.write("**Starting Location**")
-    # [Your st_searchbox Autocomplete setup here...]
+    if api_status == "Valid":
+        start_loc = st_searchbox(
+            search_google_places,
+            key="start_location_search",
+            placeholder="Type starting address..."
+        )
+    else:
+        start_loc = st.text_input("Starting Location (Fallback mode)", placeholder="Type address manually...", key="start_fallback")
+
 with col_dest:
     st.write("**Destination**")
-    # [Your st_searchbox Autocomplete setup here...]
+    if api_status == "Valid":
+        dest_loc = st_searchbox(
+            search_google_places,
+            key="destination_search",
+            placeholder="Type destination address..."
+        )
+    else:
+        dest_loc = st.text_input("Destination (Fallback mode)", placeholder="Type address manually...", key="dest_fallback")
 
 col_purpose, col_rt = st.columns([3, 1])
 with col_purpose:
-    purpose = st.text_input("Purpose of Travel")
+    purpose = st.text_input("Purpose of Travel", key="journey_purpose")
 with col_rt:
-    round_trip = st.selectbox("Round Trip?", ["No", "Yes"])
+    round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key="journey_round_trip")
 
 # --- ODOMETER INTERACTION BLOCK ---
 st.markdown("##### 🚗 Odometer Sync Settings")
@@ -328,12 +345,13 @@ st.write("Provide *either* Start or End. The tool checks Google Maps and dynamic
 
 col_odo_start, col_odo_end = st.columns(2)
 with col_odo_start:
-    # Use value=0 but let it accept empty blanks by switching to clearable inputs or text inputs
-    odo_start_input = st.text_input("Odometer Start", value="", placeholder="e.g., 45100")
+    odo_start_input = st.text_input("Odometer Start", value="", placeholder="e.g., 45100", key="journey_odo_start")
 with col_odo_end:
-    odo_end_input = st.text_input("Odometer End", value="", placeholder="e.g., 45125")
+    odo_end_input = st.text_input("Odometer End", value="", placeholder="e.g., 45125", key="journey_odo_end")
 
-submit_button = st.button("Calculate & Add Entry", type="primary")
+submit_button = st.button("Calculate & Add Entry", type="primary", key="journey_submit_btn")
+
+
 
 # --- FORM LOGIC ---
 if submit_button:
