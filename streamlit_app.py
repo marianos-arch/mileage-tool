@@ -169,7 +169,7 @@ if uploaded_template is not None and st.session_state.uploaded_file_bytes is Non
                     "Date": formatted_date,
                     "Starting Location": "Imported from template", 
                     "Destination": str(sheet3[f"C{row_idx}"].value or ""),
-                    "Round Trip": "No",
+                    "Round Trip": "Yes",
                     "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
                     "Odometer Start": 0,
                     "Odometer End": 0,
