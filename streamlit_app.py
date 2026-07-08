@@ -133,7 +133,7 @@ with st.expander("🛠️ API Key Debugger & Config"):
 
 st.markdown("---")
 
-# --- NEW: EXCEL TEMPLATE UPLOADER & INGESTION ---
+# --- EXCEL TEMPLATE UPLOADER & INGESTION (UPDATED) ---
 st.header("📂 Excel Template Synchronization")
 uploaded_template = st.file_uploader("Upload your company mileage workbook (.xlsx)", type=["xlsx"])
 
@@ -141,42 +141,52 @@ if uploaded_template is not None and st.session_state.uploaded_file_bytes is Non
     # Save file bytes in state to maintain permanence during updates
     st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
     
-    # Ingest data out of the file layout
     try:
         wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
         
-        # Ingest Sheet 1 Metadata
+        # 1. Ingest Sheet 1 Metadata
         sheet1 = wb.worksheets[0]
         st.session_state.employee_name = str(sheet1["D11"].value or "")
         st.session_state.date_range_str = str(sheet1["D15"].value or "")
         
-        # Ingest Sheet 3 Existing Journey Entries
+        # 2. Ingest Sheet 3 Existing Journey Entries
         if len(wb.worksheets) >= 3:
             sheet3 = wb.worksheets[2]
             existing_rows = []
             
-            # Start loop at Row 4, tracking dynamically downwards until an empty Date row is hit
+            # Start scanning loop at Row 4 down until an empty Date cell is hit
             row_idx = 4
             while sheet3[f"B{row_idx}"].value is not None:
+                # Handle Excel datetime objects vs raw strings safely
+                raw_date = sheet3[f"B{row_idx}"].value
+                if isinstance(raw_date, (datetime.date, datetime.datetime)):
+                    formatted_date = raw_date.strftime("%Y-%m-%d")
+                else:
+                    formatted_date = str(raw_date)[:10]
+                
+                # Append rows mapping exactly to our internal DataFrame schema
                 existing_rows.append({
-                    "Date": str(sheet3[f"B{row_idx}"].value)[:10], # Truncate date strings safely
-                    "Starting Location": "Imported from template", # Placeholder since source only stores destination
+                    "Date": formatted_date,
+                    "Starting Location": "Imported from template", 
                     "Destination": str(sheet3[f"C{row_idx}"].value or ""),
                     "Round Trip": "No",
-                    "Purpose of Travel": f"[{sheet3[f'D{row_idx}'].value or ''}] {sheet3[f'E{row_idx}'].value or ''}".strip(),
+                    "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
                     "Odometer Start": 0,
                     "Odometer End": 0,
-                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0)
+                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
+                    "Program Code": str(sheet3[f"D{row_idx}"].value or "")
                 })
                 row_idx += 1
                 
             if existing_rows:
+                # Synchronize the main DataFrame with the imported Excel records
                 st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                st.toast(f"Successfully recovered {len(existing_rows)} legacy rows from sheet 3!", icon="📥")
+                st.toast(f"Imported {len(existing_rows)} existing journey records from sheet 3!", icon="📥")
                 
         st.rerun()
     except Exception as e:
         st.error(f"Failed parsing workbook configuration parameters: {e}")
+
 
 st.markdown("---")
 
