@@ -249,6 +249,7 @@ else:
 st.markdown("---")
 
 # --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION ---
+# --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION (COMPLETED) ---
 st.header("🗺️ Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
@@ -258,6 +259,8 @@ if not st.session_state.mileage_data.empty:
     destination = last_entry["Destination"]
     trip_miles = last_entry["Calculated Mileage"]
     is_round_trip = last_entry["Round Trip"] == "Yes"
+    entry_date = last_entry["Date"]
+    entry_purpose = last_entry["Purpose of Travel"]
     
     # 2. Format labels dynamically based on Round Trip status
     if is_round_trip:
@@ -277,22 +280,37 @@ if not st.session_state.mileage_data.empty:
     formatted_destination = destination.replace(" ", "+")
     
     # 3. GENERATE THE PERFECT DIRECT PRINT LINK
-    # This URL targets full web google maps for native printing/notes interface
     if is_round_trip:
         # Full web URL format: Origin -> Destination -> Back to Origin
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/{formatted_origin}/"
     else:
+        # Standard One Way
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/"
         
     st.markdown("##### Actions")
-    # Using a clean link button that launches a new tab directly to full Google Maps routing
-    st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary")
-    st.caption("💡 *How it works:* Clicking this button opens the route directly in Google Maps. Press **Ctrl+P** (or click their menu) in that new tab to use Google's clean print layout with custom notes functionality!")
+    
+    # Side-by-side uniform layout configuration
+    action_col1, action_col2 = st.columns([1, 1])
+    
+    with action_col1:
+        # Secure direct link mechanism targeting full maps app layout
+        st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary", use_container_width=True)
+        st.caption("💡 *How to print:* In the new tab, press **Ctrl+P** (or **Cmd+P**) to trigger Google's clean print wizard.")
 
-    # 4. Render map via Google Maps Embed API using 'waypoints' if it's a Round Trip
+    with action_col2:
+        # Build your dynamic target string
+        text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
+        
+        # Display via st.code to inherit native copy buttons safely without sandboxed JS errors
+        st.code(text_to_copy, language="text")
+        st.caption("📋 *Hover & click the icon on the right edge of the gray box above* to copy this text, then paste directly into Google's print notes context.")
+                
+    st.markdown("---")
+
+    # 4. Render embedded visual route map
     if api_status == "Valid":
         if is_round_trip:
-            # For a round trip visual loop: Start at A, go to Destination A, via waypoint B
+            # Multi-stop configuration: Start at A, end at A, waypoint via B
             map_url = (
                 f"https://www.google.com/maps/embed/v1/directions"
                 f"?key={st.session_state.api_key}"
@@ -302,7 +320,7 @@ if not st.session_state.mileage_data.empty:
                 f"&mode=driving"
             )
         else:
-            # Standard One Way
+            # Standard one-way visual trace mapping
             map_url = (
                 f"https://www.google.com/maps/embed/v1/directions"
                 f"?key={st.session_state.api_key}"
