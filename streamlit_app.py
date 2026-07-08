@@ -342,81 +342,86 @@ st.markdown("---")
 st.header("🗺️ Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
-    # 1. Grab the most recent valid entry from the DataFrame
-    last_entry = st.session_state.mileage_data.iloc[-1]
-    
-    origin = last_entry["Starting Location"]
-    destination = last_entry["Destination"]
-    
-    # Clean up imported tag to allow map processing fallback
-    if origin == "Imported from template":
-        origin = "Current Location"
-        
-    # Strip programmatic structural tags if present
-    clean_dest = destination.replace(" (RT)", "") if isinstance(destination, str) else str(destination)
+    # 1. Filter out the imported lines to isolate only newly calculated app entries
+    new_app_entries = st.session_state.mileage_data[
+        st.session_state.mileage_data["Starting Location"] != "Imported from template"
+    ]
 
-    trip_miles = last_entry["Calculated Mileage"]
-    is_round_trip = last_entry["Round Trip"] == "Yes"
-    entry_date = last_entry["Date"]
-    entry_purpose = last_entry["Purpose of Travel"]
-    
-    if is_round_trip:
-        route_label = f"{origin} ➡️ {clean_dest} 🔄 {origin} (Round Trip)"
-        mileage_label = f"{trip_miles} miles (Total Round Trip)"
-    else:
-        route_label = f"{origin} ➡️ {clean_dest}"
-        mileage_label = f"{trip_miles} miles (One Way)"
+    if not new_app_entries.empty:
+        # 2. Grab the most recent entry created inside the app
+        last_entry = new_app_entries.iloc[-1]
         
-    st.subheader("Current Route Detail")
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Route Leg", route_label)
-    col_m2.metric("Odometer Calculated Distance", mileage_label)
-    
-    # Safe web URL parsing 
-    encoded_origin = urllib.parse.quote_plus(origin)
-    encoded_destination = urllib.parse.quote_plus(clean_dest)
-    
-    # Web Hyperlink for Google Maps Print Layout
-    if is_round_trip:
-        direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/{encoded_origin}/"
-    else:
-        direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/"
+        origin = last_entry["Starting Location"]
+        destination = last_entry["Destination"]
         
-    st.markdown("##### Actions")
-    action_col1, action_col2 = st.columns([1, 1])
-    
-    with action_col1:
-        st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary", use_container_width=True)
-        st.caption("💡 *How to print:* In the new window, click the **Print** icon on the top right, or hit **Ctrl+P** / **Cmd+P**.")
+        # Strip structural tags from destinations if round trip was selected
+        clean_dest = destination.replace(" (RT)", "") if isinstance(destination, str) else str(destination)
 
-    with action_col2:
-        text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
-        st.code(text_to_copy, language="text")
-        st.caption("📋 *Click the icon on the right edge of the gray box* to copy notes for your records.")
-                
-    st.markdown("---")
-
-    # 4. Correct Google Maps Iframe Rendering Engine (Embed API v1)
-    if api_status == "Valid" and origin != "Current Location":
+        trip_miles = last_entry["Calculated Mileage"]
+        is_round_trip = last_entry["Round Trip"] == "Yes"
+        entry_date = last_entry["Date"]
+        entry_purpose = last_entry["Purpose of Travel"]
+        
+        # 3. Setup user display metrics
         if is_round_trip:
-            # Directions layout with a round trip requires setting the origin back as destination + adding waypoint
-            map_url = (
-                f"https://www.google.com/maps/embed/v1/directions"
-                f"?key={st.session_state.api_key}"
-                f"&origin={encoded_origin}"
-                f"&destination={encoded_origin}"
-                f"&waypoints={encoded_destination}"
-            )
+            route_label = f"{origin} ➡️ {clean_dest} 🔄 {origin} (Round Trip)"
+            mileage_label = f"{trip_miles} miles (Total Round Trip)"
         else:
-            map_url = (
-                f"https://www.google.com/maps/embed/v1/directions"
-                f"?key={st.session_state.api_key}"
-                f"&origin={encoded_origin}"
-                f"&destination={encoded_destination}"
-            )
+            route_label = f"{origin} ➡️ {clean_dest}"
+            mileage_label = f"{trip_miles} miles (One Way)"
             
-        st.components.v1.iframe(map_url, width=900, height=500)
+        st.subheader("Current App Route Detail")
+        col_m1, col_m2 = st.columns(2)
+        col_m1.metric("Route Leg", route_label)
+        col_m2.metric("Odometer Calculated Distance", mileage_label)
+        
+        # Safe URL URL-encoding for Google Maps string schemas
+        encoded_origin = urllib.parse.quote_plus(origin)
+        encoded_destination = urllib.parse.quote_plus(clean_dest)
+        
+        # Web Link Layout targeting clean printable components
+        if is_round_trip:
+            direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/{encoded_origin}/"
+        else:
+            direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/"
+            
+        st.markdown("##### Actions")
+        action_col1, action_col2 = st.columns([1, 1])
+        
+        with action_col1:
+            st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary", use_container_width=True)
+            st.caption("💡 *How to print:* In the new window, click the **Print** icon on the top right, or hit **Ctrl+P** / **Cmd+P**.")
+
+        with action_col2:
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
+            st.code(text_to_copy, language="text")
+            st.caption("📋 *Click the icon on the right edge of the gray box* to copy notes for your records.")
+                    
+        st.markdown("---")
+
+        # 4. Render maps iframe exclusively for valid app-entered text strings
+        if api_status == "Valid":
+            if is_round_trip:
+                map_url = (
+                    f"https://www.google.com/maps/embed/v1/directions"
+                    f"?key={st.session_state.api_key}"
+                    f"&origin={encoded_origin}"
+                    f"&destination={encoded_origin}"
+                    f"&waypoints={encoded_destination}"
+                )
+            else:
+                map_url = (
+                    f"https://www.google.com/maps/embed/v1/directions"
+                    f"?key={st.session_state.api_key}"
+                    f"&origin={encoded_origin}"
+                    f"&destination={encoded_destination}"
+                )
+                
+            st.components.v1.iframe(map_url, width=900, height=500)
+        else:
+            st.info("🔄 Map preview paused. Please connect a valid Google Maps API Key to render visualizations.")
     else:
-        st.info("🔄 Map preview unavailable. Enter a live Google address above to display the geographic route.")
+        # Shown if sheet records are imported, but user hasn't typed a new journey yet
+        st.info("📅 Sheet template journeys are cached. Add a new manual entry above to view map traces and printing utilities.")
 else:
     st.write("Add an entry above to generate the live map route.")
