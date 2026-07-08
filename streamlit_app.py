@@ -260,49 +260,57 @@ if not st.session_state.mileage_data.empty:
     is_round_trip = last_entry["Round Trip"] == "Yes"
     
     # 2. Format labels dynamically based on Round Trip status
-    route_label = f"{origin} 🔄 {destination} (Round Trip)" if is_round_trip else f"{origin} ➡️ {destination}"
-    mileage_label = f"{trip_miles} miles (Total Round Trip)" if is_round_trip else f"{trip_miles} miles (One Way)"
+    if is_round_trip:
+        route_label = f"{origin} ➡️ {destination} 🔄 {origin} (Round Trip)"
+        mileage_label = f"{trip_miles} miles (Total Round Trip)"
+    else:
+        route_label = f"{origin} ➡️ {destination}"
+        mileage_label = f"{trip_miles} miles (One Way)"
     
     st.subheader(f"Current Route Detail")
     col_m1, col_m2 = st.columns(2)
     col_m1.metric("Route Leg", route_label)
     col_m2.metric("Odometer Calculated Distance", mileage_label)
     
-    # 3. REAL WORKING PRINT BUTTON (Executes true browser window print via JS)
-    st.markdown("##### Actions")
-    st.components.v1.html(
-        """
-        <button onclick="window.parent.print();" style="
-            background-color: #FF4B4B;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        ">🖨️ Print This Page Layout</button>
-        """,
-        height=50,
-    )
-    st.caption("💡 *Pro-Tip:* In your browser's print popup menu, you can select **'Save as PDF'** to export clean digital copies of this travel record.")
+    # URL safe conversion for locations
+    formatted_origin = origin.replace(" ", "+")
+    formatted_destination = destination.replace(" ", "+")
     
-    # 4. Render map via Google Maps Embed API using 'directions' mode
-    if api_status == "Valid":
-        formatted_origin = origin.replace(" ", "+")
-        formatted_destination = destination.replace(" ", "+")
+    # 3. GENERATE THE PERFECT DIRECT PRINT LINK
+    # This URL targets full web google maps for native printing/notes interface
+    if is_round_trip:
+        # Full web URL format: Origin -> Destination -> Back to Origin
+        direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/{formatted_origin}/"
+    else:
+        direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/"
         
-        map_url = (
-            f"https://www.google.com/maps/embed/v1/directions"
-            f"?key={st.session_state.api_key}"
-            f"&origin={formatted_origin}"
-            f"&destination={formatted_destination}"
-            f"&mode=driving"
-        )
+    st.markdown("##### Actions")
+    # Using a clean link button that launches a new tab directly to full Google Maps routing
+    st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary")
+    st.caption("💡 *How it works:* Clicking this button opens the route directly in Google Maps. Press **Ctrl+P** (or click their menu) in that new tab to use Google's clean print layout with custom notes functionality!")
+
+    # 4. Render map via Google Maps Embed API using 'waypoints' if it's a Round Trip
+    if api_status == "Valid":
+        if is_round_trip:
+            # For a round trip visual loop: Start at A, go to Destination A, via waypoint B
+            map_url = (
+                f"https://www.google.com/maps/embed/v1/directions"
+                f"?key={st.session_state.api_key}"
+                f"&origin={formatted_origin}"
+                f"&destination={formatted_origin}"
+                f"&waypoints={formatted_destination}"
+                f"&mode=driving"
+            )
+        else:
+            # Standard One Way
+            map_url = (
+                f"https://www.google.com/maps/embed/v1/directions"
+                f"?key={st.session_state.api_key}"
+                f"&origin={formatted_origin}"
+                f"&destination={formatted_destination}"
+                f"&mode=driving"
+            )
+            
         st.components.v1.iframe(map_url, width=900, height=500)
     else:
         st.info("🔄 Map streaming paused because the API status is currently offline or invalid.")
