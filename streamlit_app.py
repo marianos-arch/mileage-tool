@@ -257,17 +257,41 @@ if not st.session_state.mileage_data.empty:
     origin = last_entry["Starting Location"]
     destination = last_entry["Destination"]
     trip_miles = last_entry["Calculated Mileage"]
+    is_round_trip = last_entry["Round Trip"] == "Yes"
     
-    # 2. Display summary metrics right above the route map
+    # 2. Format labels dynamically based on Round Trip status
+    route_label = f"{origin} 🔄 {destination} (Round Trip)" if is_round_trip else f"{origin} ➡️ {destination}"
+    mileage_label = f"{trip_miles} miles (Total Round Trip)" if is_round_trip else f"{trip_miles} miles (One Way)"
+    
     st.subheader(f"Current Route Detail")
     col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Route Leg", f"{origin} ➡️ {destination}")
-    col_m2.metric("Odometer Calculated Distance", f"{trip_miles} miles")
+    col_m1.metric("Route Leg", route_label)
+    col_m2.metric("Odometer Calculated Distance", mileage_label)
     
-    if st.button("🖨️ Open Clean Print View", key="print_view_btn"):
-        st.warning("Press Ctrl+P (or Cmd+P on Mac) to print this layout configuration.")
+    # 3. REAL WORKING PRINT BUTTON (Executes true browser window print via JS)
+    st.markdown("##### Actions")
+    st.components.v1.html(
+        """
+        <button onclick="window.parent.print();" style="
+            background-color: #FF4B4B;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        ">🖨️ Print This Page Layout</button>
+        """,
+        height=50,
+    )
+    st.caption("💡 *Pro-Tip:* In your browser's print popup menu, you can select **'Save as PDF'** to export clean digital copies of this travel record.")
     
-    # 3. Render map via Google Maps Embed API using 'directions' mode
+    # 4. Render map via Google Maps Embed API using 'directions' mode
     if api_status == "Valid":
         formatted_origin = origin.replace(" ", "+")
         formatted_destination = destination.replace(" ", "+")
@@ -282,7 +306,7 @@ if not st.session_state.mileage_data.empty:
         st.components.v1.iframe(map_url, width=900, height=500)
     else:
         st.info("🔄 Map streaming paused because the API status is currently offline or invalid.")
-        st.code(f"[Google Map Route Preview]\nFrom: {origin}\nTo: {destination}\nCalculated Form Distance: {trip_miles} miles")
+        st.code(f"[Google Map Route Preview]\nRoute: {route_label}\nCalculated Distance: {mileage_label}")
 else:
     st.write("Add an entry above to generate the live map route.")
 
