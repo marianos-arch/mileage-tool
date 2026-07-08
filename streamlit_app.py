@@ -154,8 +154,8 @@ if uploaded_template is not None and st.session_state.uploaded_file_bytes is Non
             sheet3 = wb.worksheets[2]
             existing_rows = []
             
-            # Start scanning loop at Row 4 down until an empty Date cell is hit
-            row_idx = 4
+            # CHANGED FROM 4 TO 5: Skip the header row ('Total Miles', etc.) and start at first data row
+            row_idx = 5 
             while sheet3[f"B{row_idx}"].value is not None:
                 # Handle Excel datetime objects vs raw strings safely
                 raw_date = sheet3[f"B{row_idx}"].value
@@ -313,13 +313,13 @@ if st.session_state.uploaded_file_bytes is not None:
             s1 = output_wb.worksheets[0]
             s1["D11"] = st.session_state.employee_name
             s1["D15"] = st.session_state.date_range_str
-            
+
             # 2. Update Sheet 3 Route Lines safely down rows
             if len(output_wb.worksheets) >= 3:
                 s3 = output_wb.worksheets[2]
                 
-                # Scan downwards to find where rows are empty to avoid overwriting existing data
-                current_write_row = 4
+                # CHANGED FROM 4 TO 5: Start looking for empty rows under the headers
+                current_write_row = 5
                 while s3[f"B{current_write_row}"].value is not None:
                     current_write_row += 1
                 
