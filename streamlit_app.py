@@ -3,6 +3,8 @@ import pandas as pd
 import datetime
 import googlemaps # pip install googlemaps
 from streamlit_searchbox import st_searchbox # pip install streamlit-searchbox
+import openpyxl # pip install openpyxl
+from io import BytesIO
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Company Mileage Tracker", layout="wide")
@@ -84,6 +86,15 @@ if "mileage_data" not in st.session_state:
         "Purpose of Travel", "Odometer Start", "Odometer End", "Calculated Mileage"
     ])
 
+if "employee_name" not in st.session_state:
+    st.session_state.employee_name = ""
+
+if "date_range_str" not in st.session_state:
+    st.session_state.date_range_str = ""
+
+if "uploaded_file_bytes" not in st.session_state:
+    st.session_state.uploaded_file_bytes = None
+
 # --- HEADER SECTION ---
 st.title("🚗 Company Mileage Tracker")
 
@@ -122,26 +133,71 @@ with st.expander("🛠️ API Key Debugger & Config"):
 
 st.markdown("---")
 
+# --- NEW: EXCEL TEMPLATE UPLOADER & INGESTION ---
+st.header("📂 Excel Template Synchronization")
+uploaded_template = st.file_uploader("Upload your company mileage workbook (.xlsx)", type=["xlsx"])
+
+if uploaded_template is not None and st.session_state.uploaded_file_bytes is None:
+    # Save file bytes in state to maintain permanence during updates
+    st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
+    
+    # Ingest data out of the file layout
+    try:
+        wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
+        
+        # Ingest Sheet 1 Metadata
+        sheet1 = wb.worksheets[0]
+        st.session_state.employee_name = str(sheet1["D11"].value or "")
+        st.session_state.date_range_str = str(sheet1["D15"].value or "")
+        
+        # Ingest Sheet 3 Existing Journey Entries
+        if len(wb.worksheets) >= 3:
+            sheet3 = wb.worksheets[2]
+            existing_rows = []
+            
+            # Start loop at Row 4, tracking dynamically downwards until an empty Date row is hit
+            row_idx = 4
+            while sheet3[f"B{row_idx}"].value is not None:
+                existing_rows.append({
+                    "Date": str(sheet3[f"B{row_idx}"].value)[:10], # Truncate date strings safely
+                    "Starting Location": "Imported from template", # Placeholder since source only stores destination
+                    "Destination": str(sheet3[f"C{row_idx}"].value or ""),
+                    "Round Trip": "No",
+                    "Purpose of Travel": f"[{sheet3[f'D{row_idx}'].value or ''}] {sheet3[f'E{row_idx}'].value or ''}".strip(),
+                    "Odometer Start": 0,
+                    "Odometer End": 0,
+                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0)
+                })
+                row_idx += 1
+                
+            if existing_rows:
+                st.session_state.mileage_data = pd.DataFrame(existing_rows)
+                st.toast(f"Successfully recovered {len(existing_rows)} legacy rows from sheet 3!", icon="📥")
+                
+        st.rerun()
+    except Exception as e:
+        st.error(f"Failed parsing workbook configuration parameters: {e}")
+
+st.markdown("---")
+
 # --- SECTION 1: COVER SHEET INFO ---
 st.header("📋 Cover Sheet Information")
 col1, col2 = st.columns(2)
 
 with col1:
-    employee_name = st.text_input("Employee Name (C3 / D11)", placeholder="John Doe", key="cs_employee_name")
+    employee_name = st.text_input("Employee Name (C3 / D11)", value=st.session_state.employee_name, placeholder="John Doe", key="cs_employee_name")
+    st.session_state.employee_name = employee_name
 
 with col2:
-    today = datetime.date.today()
-    selected_month = st.selectbox("Time Period (Month)", 
-                                  ["January", "February", "March", "April", "May", "June", 
-                                   "July", "August", "September", "October", "November", "December"],
-                                  index=today.month - 1, key="cs_selected_month")
-    st.caption(f"Selected Period: **{selected_month} 2026**")
+    date_range = st.text_input("Time Period / Date Range (D15)", value=st.session_state.date_range_str, placeholder="e.g., July 1 - July 31, 2026", key="cs_date_range")
+    st.session_state.date_range_str = date_range
 
 st.markdown("---")
 
 # --- SECTION 2: USER INPUT FORM ---
 st.header("📍 Add New Journey")
 
+today = datetime.date.today()
 col_date, col_start, col_dest = st.columns(3)
 with col_date:
     travel_date = st.date_input("Date", value=today, key="journey_travel_date")
@@ -149,35 +205,27 @@ with col_date:
 with col_start:
     st.write("**Starting Location**")
     if api_status == "Valid":
-        start_loc = st_searchbox(
-            search_google_places,
-            key="start_location_search",
-            placeholder="Type starting address..."
-        )
+        start_loc = st_searchbox(search_google_places, key="start_location_search", placeholder="Type starting address...")
     else:
         start_loc = st.text_input("Starting Location (Fallback mode)", placeholder="Type address manually...", key="start_fallback")
 
 with col_dest:
     st.write("**Destination**")
     if api_status == "Valid":
-        dest_loc = st_searchbox(
-            search_google_places,
-            key="destination_search",
-            placeholder="Type destination address..."
-        )
+        dest_loc = st_searchbox(search_google_places, key="destination_search", placeholder="Type destination address...")
     else:
         dest_loc = st.text_input("Destination (Fallback mode)", placeholder="Type address manually...", key="dest_fallback")
 
-col_purpose, col_rt = st.columns([3, 1])
+col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
 with col_purpose:
     purpose = st.text_input("Purpose of Travel", key="journey_purpose")
+with col_prog_code:
+    program_code = st.text_input("Program Code (D4)", placeholder="e.g., PROG-101", key="journey_prog_code")
 with col_rt:
     round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key="journey_round_trip")
 
 # --- ODOMETER INTERACTION BLOCK ---
 st.markdown("##### 🚗 Odometer Sync Settings")
-st.write("Provide *either* Start or End. The tool checks Google Maps and dynamically fills the missing value.")
-
 col_odo_start, col_odo_end = st.columns(2)
 with col_odo_start:
     odo_start_input = st.text_input("Odometer Start", value="", placeholder="e.g., 45100", key="journey_odo_start")
@@ -191,17 +239,12 @@ if submit_button:
     if not start_loc or not dest_loc:
         st.error("Error: Please provide both a Starting Location and Destination.")
     else:
-        # 1. Fetch exact route distance from Google Maps
         google_miles = get_google_distance_miles(start_loc, dest_loc)
-        
-        # Double the miles if round trip flag is checked
         calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles
         
-        # 2. Convert Odometer fields safely to integers if provided
         o_start = int(odo_start_input) if odo_start_input.strip().isdigit() else None
         o_end = int(odo_end_input) if odo_end_input.strip().isdigit() else None
         
-        # 3. Smart Odometer Autocompletion Logic
         if o_start is not None and o_end is None:
             o_end = int(o_start + calculated_miles)
         elif o_end is not None and o_start is None:
@@ -211,16 +254,17 @@ if submit_button:
         else:
             o_start, o_end = 0, int(calculated_miles)
 
-        # 4. Save entry to DataFrame
+        # Build structural row
         new_entry = {
             "Date": travel_date.strftime("%Y-%m-%d"),
             "Starting Location": start_loc,
-            "Destination": dest_loc,
+            "Destination": f"{dest_loc} (RT)" if round_trip == "Yes" else dest_loc,
             "Round Trip": round_trip,
             "Purpose of Travel": purpose,
             "Odometer Start": o_start,
             "Odometer End": o_end,
-            "Calculated Mileage": calculated_miles
+            "Calculated Mileage": calculated_miles,
+            "Program Code": program_code  # Retained specifically for Sheet 3 targeting
         }
         st.session_state.mileage_data = pd.concat([st.session_state.mileage_data, pd.DataFrame([new_entry])], ignore_index=True)
         st.success(f"Added! Google Route Distance: {google_miles} miles calculated.")
@@ -242,27 +286,75 @@ if not st.session_state.mileage_data.empty:
         key="mileage_editor"
     )
     st.session_state.mileage_data = edited_df
-    st.caption("💡 *Tip: You can double-click cells to edit them directly, or select a row and hit 'Delete' on your keyboard.*")
 else:
     st.info("No mileage entries added yet.")
+
+# --- NEW: WORKBOOK WRITE & GENERATION PIPELINE ---
+if st.session_state.uploaded_file_bytes is not None:
+    st.subheader("💾 Export Back to Uploaded Excel Template")
+    st.markdown("Clicking the generator below safely builds a download bundle updating `Sheet 1` and `Sheet 3` without overriding formatting styles.")
+    
+    if st.button("Generate Updated Excel Document", type="secondary"):
+        try:
+            # Load active state stream object directly 
+            output_wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes))
+            
+            # 1. Update Sheet 1 Cover Details
+            s1 = output_wb.worksheets[0]
+            s1["D11"] = st.session_state.employee_name
+            s1["D15"] = st.session_state.date_range_str
+            
+            # 2. Update Sheet 3 Route Lines safely down rows
+            if len(output_wb.worksheets) >= 3:
+                s3 = output_wb.worksheets[2]
+                
+                # Scan downwards to find where rows are empty to avoid overwriting existing data
+                current_write_row = 4
+                while s3[f"B{current_write_row}"].value is not None:
+                    current_write_row += 1
+                
+                # Write only the new rows added during this session
+                # If we imported data, we look for rows that aren't placeholders
+                new_session_rows = st.session_state.mileage_data[
+                    st.session_state.mileage_data["Starting Location"] != "Imported from template"
+                ]
+                
+                for _, row in new_session_rows.iterrows():
+                    s3[f"B{current_write_row}"] = row["Date"]
+                    s3[f"C{current_write_row}"] = row["Destination"]
+                    s3[f"D{current_write_row}"] = row.get("Program Code", "")
+                    s3[f"E{current_write_row}"] = row["Purpose of Travel"]
+                    s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                    current_write_row += 1
+                    
+            # 3. Stream back bytes array to download button container
+            excel_stream = BytesIO()
+            output_wb.save(excel_stream)
+            excel_stream.seek(0)
+            
+            st.download_button(
+                label="📥 Download Updated Excel File",
+                data=excel_stream,
+                file_name=f"Mileage_Report_{st.session_state.employee_name.replace(' ', '_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except Exception as e:
+            st.error(f"Error compiling output modifications: {e}")
 
 st.markdown("---")
 
 # --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION ---
-# --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION (COMPLETED) ---
 st.header("🗺️ Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
-    # 1. Grab the most recent entry from the DataFrame
     last_entry = st.session_state.mileage_data.iloc[-1]
-    origin = last_entry["Starting Location"]
+    origin = last_entry.get("Starting Location", "Unknown")
     destination = last_entry["Destination"]
     trip_miles = last_entry["Calculated Mileage"]
     is_round_trip = last_entry["Round Trip"] == "Yes"
     entry_date = last_entry["Date"]
     entry_purpose = last_entry["Purpose of Travel"]
     
-    # 2. Format labels dynamically based on Round Trip status
     if is_round_trip:
         route_label = f"{origin} ➡️ {destination} 🔄 {origin} (Round Trip)"
         mileage_label = f"{trip_miles} miles (Total Round Trip)"
@@ -275,42 +367,30 @@ if not st.session_state.mileage_data.empty:
     col_m1.metric("Route Leg", route_label)
     col_m2.metric("Odometer Calculated Distance", mileage_label)
     
-    # URL safe conversion for locations
-    formatted_origin = origin.replace(" ", "+")
-    formatted_destination = destination.replace(" ", "+")
+    formatted_origin = str(origin).replace(" ", "+")
+    formatted_destination = str(destination).replace(" ", "+")
     
-    # 3. GENERATE THE PERFECT DIRECT PRINT LINK
     if is_round_trip:
-        # Full web URL format: Origin -> Destination -> Back to Origin
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/{formatted_origin}/"
     else:
-        # Standard One Way
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/"
         
     st.markdown("##### Actions")
-    
-    # Side-by-side uniform layout configuration
     action_col1, action_col2 = st.columns([1, 1])
     
     with action_col1:
-        # Secure direct link mechanism targeting full maps app layout
         st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary", use_container_width=True)
         st.caption("💡 *How to print:* In the new tab, press **Ctrl+P** (or **Cmd+P**) to trigger Google's clean print wizard.")
 
     with action_col2:
-        # Build your dynamic target string
         text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
-        
-        # Display via st.code to inherit native copy buttons safely without sandboxed JS errors
         st.code(text_to_copy, language="text")
         st.caption("📋 *Hover & click the icon on the right edge of the gray box above* to copy this text, then paste directly into Google's print notes context.")
                 
     st.markdown("---")
 
-    # 4. Render embedded visual route map
-    if api_status == "Valid":
+    if api_status == "Valid" and origin != "Imported from template":
         if is_round_trip:
-            # Multi-stop configuration: Start at A, end at A, waypoint via B
             map_url = (
                 f"https://www.google.com/maps/embed/v1/directions"
                 f"?key={st.session_state.api_key}"
@@ -320,7 +400,6 @@ if not st.session_state.mileage_data.empty:
                 f"&mode=driving"
             )
         else:
-            # Standard one-way visual trace mapping
             map_url = (
                 f"https://www.google.com/maps/embed/v1/directions"
                 f"?key={st.session_state.api_key}"
@@ -331,8 +410,7 @@ if not st.session_state.mileage_data.empty:
             
         st.components.v1.iframe(map_url, width=900, height=500)
     else:
-        st.info("🔄 Map streaming paused because the API status is currently offline or invalid.")
-        st.code(f"[Google Map Route Preview]\nRoute: {route_label}\nCalculated Distance: {mileage_label}")
+        st.info("🔄 Visual map preview tracking handles fresh entries created inside this session interface.")
 else:
     st.write("Add an entry above to generate the live map route.")
 
