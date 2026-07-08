@@ -354,73 +354,178 @@ if st.session_state.uploaded_file_bytes is not None:
 st.markdown("---")
 
 # --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION ---
+# --- SECTION 4: GOOGLE MAPS ROUTE VISUALIZATION (COMPLETED) ---
+
 st.header("🗺️ Route Map & Print View")
 
+
+
 if not st.session_state.mileage_data.empty:
+
+    # 1. Grab the most recent entry from the DataFrame
+
     last_entry = st.session_state.mileage_data.iloc[-1]
-    origin = last_entry.get("Starting Location", "Unknown")
+
+    origin = last_entry["Starting Location"]
+
     destination = last_entry["Destination"]
+
     trip_miles = last_entry["Calculated Mileage"]
+
     is_round_trip = last_entry["Round Trip"] == "Yes"
+
     entry_date = last_entry["Date"]
+
     entry_purpose = last_entry["Purpose of Travel"]
+
     
+
+    # 2. Format labels dynamically based on Round Trip status
+
     if is_round_trip:
+
         route_label = f"{origin} ➡️ {destination} 🔄 {origin} (Round Trip)"
+
         mileage_label = f"{trip_miles} miles (Total Round Trip)"
+
     else:
+
         route_label = f"{origin} ➡️ {destination}"
+
         mileage_label = f"{trip_miles} miles (One Way)"
+
     
+
     st.subheader(f"Current Route Detail")
+
     col_m1, col_m2 = st.columns(2)
+
     col_m1.metric("Route Leg", route_label)
+
     col_m2.metric("Odometer Calculated Distance", mileage_label)
+
     
-    formatted_origin = str(origin).replace(" ", "+")
-    formatted_destination = str(destination).replace(" ", "+")
+
+    # URL safe conversion for locations
+
+    formatted_origin = origin.replace(" ", "+")
+
+    formatted_destination = destination.replace(" ", "+")
+
     
+
+    # 3. GENERATE THE PERFECT DIRECT PRINT LINK
+
     if is_round_trip:
+
+        # Full web URL format: Origin -> Destination -> Back to Origin
+
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/{formatted_origin}/"
+
     else:
+
+        # Standard One Way
+
         direct_maps_url = f"https://www.google.com/maps/dir/{formatted_origin}/{formatted_destination}/"
+
         
+
     st.markdown("##### Actions")
-    action_col1, action_col2 = st.columns([1, 1])
+
     
+
+    # Side-by-side uniform layout configuration
+
+    action_col1, action_col2 = st.columns([1, 1])
+
+    
+
     with action_col1:
+
+        # Secure direct link mechanism targeting full maps app layout
+
         st.link_button("🖨️ Open Official Google Maps Print Layout", direct_maps_url, type="primary", use_container_width=True)
+
         st.caption("💡 *How to print:* In the new tab, press **Ctrl+P** (or **Cmd+P**) to trigger Google's clean print wizard.")
 
+
+
     with action_col2:
+
+        # Build your dynamic target string
+
         text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
+
+        
+
+        # Display via st.code to inherit native copy buttons safely without sandboxed JS errors
+
         st.code(text_to_copy, language="text")
+
         st.caption("📋 *Hover & click the icon on the right edge of the gray box above* to copy this text, then paste directly into Google's print notes context.")
+
                 
+
     st.markdown("---")
 
-    if api_status == "Valid" and origin != "Imported from template":
+
+
+    # 4. Render embedded visual route map
+
+    if api_status == "Valid":
+
         if is_round_trip:
+
+            # Multi-stop configuration: Start at A, end at A, waypoint via B
+
             map_url = (
+
                 f"https://www.google.com/maps/embed/v1/directions"
+
                 f"?key={st.session_state.api_key}"
+
                 f"&origin={formatted_origin}"
+
                 f"&destination={formatted_origin}"
+
                 f"&waypoints={formatted_destination}"
+
                 f"&mode=driving"
+
             )
+
         else:
+
+            # Standard one-way visual trace mapping
+
             map_url = (
+
                 f"https://www.google.com/maps/embed/v1/directions"
+
                 f"?key={st.session_state.api_key}"
+
                 f"&origin={formatted_origin}"
+
                 f"&destination={formatted_destination}"
+
                 f"&mode=driving"
+
             )
+
             
+
         st.components.v1.iframe(map_url, width=900, height=500)
+
     else:
-        st.info("🔄 Visual map preview tracking handles fresh entries created inside this session interface.")
+
+        st.info("🔄 Map streaming paused because the API status is currently offline or invalid.")
+
+        st.code(f"[Google Map Route Preview]\nRoute: {route_label}\nCalculated Distance: {mileage_label}")
+
 else:
+
     st.write("Add an entry above to generate the live map route.")
+
+st.header("🗺️ Route Map & Print View")
+
 
