@@ -173,14 +173,43 @@ with col_start:
         key="start_location_search",
         placeholder="Type starting address..."
     )
+    
+# Initialize stop tracking if not present
+if "num_stops" not in st.session_state:
+    st.session_state.num_stops = 0
 
 with col_dest:
-    st.write("**Destination**")
+    st.write("**Destinations / Stops**")
+    
+    # Primary/First Destination
     dest_loc = st_searchbox(
         search_google_places,
         key="destination_search",
-        placeholder="Type destination address..."
+        placeholder="Type final destination address..."
     )
+    
+    # Dynamic Additional Stops
+    additional_stops = []
+    for i in range(st.session_state.num_stops):
+        stop = st_searchbox(
+            search_google_places,
+            key=f"stop_search_{i}",
+            placeholder=f"Type intermediate stop #{i+1}..."
+        )
+        if stop:
+            additional_stops.append(stop)
+            
+    # Buttons to Add or Remove intermediate stops
+    c_add, c_rem = st.columns(2)
+    with c_add:
+        if st.button("➕ Add Stop", key="add_stop_btn", use_container_width=True):
+            st.session_state.num_stops += 1
+            st.rerun()
+    with c_rem:
+        if st.button("➖ Remove Stop", key="rem_stop_btn", use_container_width=True) and st.session_state.num_stops > 0:
+            st.session_state.num_stops -= 1
+            st.rerun()
+
 
 col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
 
@@ -220,26 +249,56 @@ if submit_button:
     if not start_loc or not dest_loc:
         st.error("⚠️ Please provide both a Starting Location and Destination.")
     else:
-        google_miles = get_google_distance_miles(start_loc, dest_loc)
+        # 1. Calculate mileage handling sequential stops sequentially
+        current_origin = start_loc
+        google_miles = 0.0
+        
+        # Calculate through intermediate stops
+        for stop in additional_stops:
+            google_miles += get_google_distance_miles(current_origin, stop)
+            current_origin = stop
+            
+        # Final leg to the main destination
+        google_miles += get_google_distance_miles(current_origin, dest_loc)
+        
         calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles
-        
-        o_start = int(odo_start_input) if odo_start_input.strip().isdigit() else None
-        o_end = int(odo_end_input) if odo_end_input.strip().isdigit() else None
-        
-        # Auto-fill odometer fields based on calculated distance
-        if o_start is not None and o_end is None:
-            o_end = int(o_start + calculated_miles)
-        elif o_end is not None and o_start is None:
-            o_start = int(o_end - calculated_miles)
-        elif o_start is not None and o_end is not None:
-            calculated_miles = o_end - o_start
+        # Maintain exact precision
+        calculated_miles = round(calculated_miles, 1)
+
+        # 2. Build the unified destinations string for your Excel sheets
+        if additional_stops:
+            stops_str = " -> ".join(additional_stops)
+            combined_destination = f"{stops_str} -> {dest_loc}"
         else:
-            o_start, o_end = 0, int(calculated_miles)
+            combined_destination = dest_loc
+            
+        if round_trip == "Yes":
+            combined_destination = f"{combined_destination} (RT)"
+
+# Helper function to parse input strings to float securely
+        def parse_to_float(val):
+            try:
+                return round(float(val.strip()), 1)
+            except ValueError:
+                return None
+
+        o_start = parse_to_float(odo_start_input) if odo_start_input.strip() else None
+        o_end = parse_to_float(odo_end_input) if odo_end_input.strip() else None
+        
+        # Auto-fill odometer fields preserving decimals
+        if o_start is not None and o_end is None:
+            o_end = round(o_start + calculated_miles, 1)
+        elif o_end is not None and o_start is None:
+            o_start = round(o_end - calculated_miles, 1)
+        elif o_start is not None and o_end is not None:
+            calculated_miles = round(o_end - o_start, 1)
+        else:
+            o_start, o_end = 0.0, round(calculated_miles, 1)
 
         new_entry = {
             "Date": travel_date.strftime("%Y-%m-%d"),
             "Starting Location": start_loc,
-            "Destination": f"{dest_loc} (RT)" if round_trip == "Yes" else dest_loc,
+            "Destination": combined_destination,
             "Round Trip": round_trip,
             "Purpose of Travel": purpose,
             "Odometer Start": o_start,
