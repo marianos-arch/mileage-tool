@@ -8,7 +8,7 @@ import openpyxl # pip install openpyxl
 from io import BytesIO
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Company Mileage Tracker", layout="wide")
+st.set_page_config(page_title="Mileage Tracker Tool", layout="wide")
 
 # --- API KEY MANAGEMENT ---
 if "api_key" not in st.session_state:
