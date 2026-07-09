@@ -11,11 +11,7 @@ from io import BytesIO
 st.set_page_config(page_title="Mileage Tracker Tool", layout="wide")
 
 # --- API KEY MANAGEMENT ---
-if "api_key" not in st.session_state:
-    if "GOOGLE_MAPS_API_KEY" in st.secrets:
-        st.session_state.api_key = st.secrets["GOOGLE_MAPS_API_KEY"]
-    else:
-        st.session_state.api_key = "YOUR_API_KEY"  # Fallback placeholder
+st.session_state.api_key = st.secrets["GOOGLE_MAPS_API_KEY"]
 
 # --- INITIALIZE GOOGLE MAPS CLIENT ---
 @st.cache_resource
