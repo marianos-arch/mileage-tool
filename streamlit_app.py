@@ -17,26 +17,6 @@ if "api_key" not in st.session_state:
     else:
         st.session_state.api_key = "YOUR_API_KEY"  # Fallback placeholder
 
-# --- API VALIDATION FUNCTION ---
-@st.cache_data(show_spinner=False)
-def check_api_key_status(api_key):
-    """Tests if the Google Maps API key is fundamentally valid."""
-    if not api_key or api_key == "YOUR_API_KEY":
-        return "Missing", "Please configure your Google Maps API key to enable address autocompletion."
-    
-    try:
-        test_client = googlemaps.Client(key=api_key)
-        test_client.places_autocomplete("A")
-        return "Valid", "Google Maps API connected successfully! Autocomplete and routing are online."
-    except Exception as e:
-        error_msg = str(e)
-        if "API key not valid" in error_msg:
-            return "Invalid Key", "The API key provided is not recognized by Google. Check for typos."
-        elif "The provided API key is expired" in error_msg:
-            return "Expired Key", "This Google API key has expired."
-        else:
-            return "API Error", f"Connection failed: {error_msg}"
-
 # --- INITIALIZE GOOGLE MAPS CLIENT ---
 @st.cache_resource
 def get_gmaps_client(api_key):
@@ -110,44 +90,11 @@ if "uploaded_file_bytes_2" not in st.session_state: st.session_state.uploaded_fi
 # --- HEADER SECTION ---
 st.title("🚗 Company Mileage Tracker")
 
-# --- API STATUS INDICATOR BAR (TOP OF PAGE) ---
-api_status, api_message = check_api_key_status(st.session_state.api_key)
-
-if api_status == "Valid":
-    st.success(f"🟢 **API Status: Connected** | {api_message}")
-elif api_status == "Missing":
-    st.info(f"🔵 **API Status: Not Configured** | {api_message}")
-else:
-    st.error(f"🔴 **API Status: Error ({api_status})** | {api_message}")
-
-# --- API DEBUG UTILITY EXPANDER ---
-with st.expander("🛠️ API Key Debugger & Config"):
-    st.markdown("Use this utility to dynamically test keys or read configuration diagnostic codes.")
-    
-    user_pasted_key = st.text_input(
-        "Test a temporary Google API Key:", 
-        value=st.session_state.api_key, 
-        type="password",
-        help="Paste your string here. It will instantly re-verify the token against Google Cloud endpoints."
-    )
-    
-    if user_pasted_key != st.session_state.api_key:
-        st.session_state.api_key = user_pasted_key
-        st.cache_data.clear() 
-        st.rerun()
-        
-    st.markdown(f"""
-    **Diagnostic Checklist:**
-    * Current Token Value: `{st.session_state.api_key[:5]}...{st.session_state.api_key[-5:] if len(st.session_state.api_key) > 5 else ''}`
-    * Required Library Status: `googlemaps` integration verified.
-    * Target Cloud Credentials Needed: **Places API**, **Maps Embed API**, & **Distance Matrix API**.
-    """)
-
 st.markdown("---")
 
 # --- EXCEL TEMPLATE UPLOADER & INGESTION ---
-st.header("📂 Excel Template Synchronization")
-uploaded_template = st.file_uploader("Upload your company mileage workbook (.xlsx)", type=["xlsx"])
+st.header("📂 Excel Template")
+uploaded_template = st.file_uploader("Upload your mileage workbook (.xlsx)", type=["xlsx"])
 
 if uploaded_template is not None and st.session_state.uploaded_file_bytes is None:
     st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
@@ -201,7 +148,7 @@ st.header("📋 Cover Sheet Information")
 col1, col2 = st.columns(2)
 
 with col1:
-    employee_name = st.text_input("Employee Name (C3 / D11)", value=st.session_state.employee_name, placeholder="John Doe", key="cs_employee_name")
+    employee_name = st.text_input("Employee Name", value=st.session_state.employee_name, placeholder="John Doe", key="cs_employee_name")
     st.session_state.employee_name = employee_name
 
 with col2:
