@@ -163,17 +163,12 @@ with col_date:
 
 with col_start:
     st.write("**Starting Location**")
-    if api_status == "Valid":
-        start_loc = st_searchbox(search_google_places, key="start_location_search", placeholder="Type starting address...")
-    else:
-        start_loc = st.text_input("Starting Location (Fallback mode)", placeholder="Type address manually...", key="start_fallback")
+    start_loc = st_searchbox(search_google_places, key="start_location_search", placeholder="Type starting address...")
+
 
 with col_dest:
     st.write("**Destination**")
-    if api_status == "Valid":
-        dest_loc = st_searchbox(search_google_places, key="destination_search", placeholder="Type destination address...")
-    else:
-        dest_loc = st.text_input("Destination (Fallback mode)", placeholder="Type address manually...", key="dest_fallback")
+    dest_loc = st_searchbox(search_google_places, key="destination_search", placeholder="Type destination address...")
 
 col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
 with col_purpose:
