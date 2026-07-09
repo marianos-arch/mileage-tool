@@ -146,14 +146,38 @@ with col1:
     )
     st.session_state.employee_name = employee_name
 
+
 with col2:
-    date_range = st.text_input(
-        "Time Period / Date Range",
-        value=st.session_state.date_range_str,
-        placeholder="e.g., July 1 - July 31, 2026",
-        key="cs_date_range"
+    months = [
+        "January", "February", "March", "April", "May", "June", 
+        "July", "August", "September", "October", "November", "December"
+    ]
+    
+    # Simple dictionary to look up total days in a month for 2026
+    month_days = {
+        "January": 31, "February": 28, "March": 31, "April": 30, 
+        "May": 31, "June": 30, "July": 31, "August": 31, 
+        "September": 30, "October": 31, "November": 30, "December": 31
+    }
+    
+    # Try to find index of previously loaded/saved month string to keep it sticky
+    current_month_name = st.session_state.date_range_str.split(" ")[0]
+    default_idx = months.index(current_month_name) if current_month_name in months else 0
+
+    selected_month = st.selectbox(
+        "Select Reporting Month (2026)",
+        options=months,
+        index=default_idx,
+        key="cs_month_select"
     )
-    st.session_state.date_range_str = date_range
+    
+    # Automatically compute the exact range string (e.g., "July 1 - July 31, 2026")
+    days_in_month = month_days[selected_month]
+    computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+    
+    # Update state and display read-only for transparency
+    st.session_state.date_range_str = computed_range
+    st.caption(f"📅 **Formatted Range:** {computed_range}")
 
 st.markdown("---")
 
@@ -265,15 +289,18 @@ if submit_button:
         # Maintain exact precision
         calculated_miles = round(calculated_miles, 1)
 
-        # 2. Build the unified destinations string for your Excel sheets
+        # 2. Build the date ramge destinations string in chronological order
         if additional_stops:
+            # Format: Stop 1 -> Stop 2 -> Final Destination
             stops_str = " -> ".join(additional_stops)
             combined_destination = f"{stops_str} -> {dest_loc}"
         else:
             combined_destination = dest_loc
             
+        # Append (RT) to the end of the entire chain if it's a round trip
         if round_trip == "Yes":
             combined_destination = f"{combined_destination} (RT)"
+            
 
 # Helper function to parse input strings to float securely
         def parse_to_float(val):
@@ -400,38 +427,51 @@ if not st.session_state.mileage_data.empty:
     if not new_app_entries.empty:
         # Get the most recent entry
         last_entry = new_app_entries.iloc[-1]
-        
+
         origin = last_entry["Starting Location"]
-        destination = last_entry["Destination"]
-        clean_dest = destination.replace(" (RT)", "") if isinstance(destination, str) else str(destination)
+        raw_destination = str(last_entry["Destination"])
+        
+        # Clean out the round-trip flag for URL building
+        clean_destination_chain = raw_destination.replace(" (RT)", "")
+        
+        # Split out intermediate stops if they exist
+        all_dest_legs = [leg.strip() for leg in clean_destination_chain.split(" -> ")]
+        final_destination = all_dest_legs[-1]
+        intermediate_waypoints = all_dest_legs[:-1] if len(all_dest_legs) > 1 else []
         
         trip_miles = last_entry["Calculated Mileage"]
         is_round_trip = last_entry["Round Trip"] == "Yes"
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
         
-        # Format display labels
+        # Format UI display labels beautifully
+        visual_chain = " ➡️ ".join(all_dest_legs)
         if is_round_trip:
-            route_label = f"{origin} ➡️ {clean_dest} 🔄 {origin}"
+            route_label = f"{origin} ➡️ {visual_chain} 🔄 {origin}"
             mileage_label = f"{trip_miles} miles (Round Trip)"
         else:
-            route_label = f"{origin} ➡️ {clean_dest}"
+            route_label = f"{origin} ➡️ {visual_chain}"
             mileage_label = f"{trip_miles} miles (One Way)"
         
         st.subheader("Current Route Detail")
         col_m1, col_m2 = st.columns(2)
         col_m1.metric("Route", route_label)
         col_m2.metric("Distance", mileage_label)
-        
-        # Encode URLs
+
+        # Encode elements for URLs securely
         encoded_origin = urllib.parse.quote_plus(origin)
-        encoded_destination = urllib.parse.quote_plus(clean_dest)
+        encoded_final_destination = urllib.parse.quote_plus(final_destination)
         
-        # Build Google Maps URL
+        # Encode intermediate waypoints for web/map queries
+        waypoints_joined = "|".join([urllib.parse.quote_plus(wp) for wp in intermediate_waypoints])
+        
+        # 1. Build Direct External Google Maps URL
+        # Format structure mapping parameters: dir/Origin/Waypoint1/Waypoint2/.../Destination
+        maps_url_legs = [encoded_origin] + [urllib.parse.quote_plus(wp) for wp in intermediate_waypoints] + [encoded_final_destination]
         if is_round_trip:
-            direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/{encoded_origin}/"
-        else:
-            direct_maps_url = f"https://www.google.com/maps/dir/{encoded_origin}/{encoded_destination}/"
+            maps_url_legs.append(encoded_origin)
+            
+        direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/"
         
         # Action buttons
         st.markdown("##### Actions")
@@ -450,27 +490,30 @@ if not st.session_state.mileage_data.empty:
             text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
-        
+            
         st.markdown("---")
         
-        # Render embedded map if API is valid
+        # 2. Render embedded Map Frame with Waypoint Support
         if gmaps:
+            # Append any intermediate stops + the main destination if it's a round-trip configuration
+            embed_waypoints = list(intermediate_waypoints)
             if is_round_trip:
-                map_url = (
-                    f"https://www.google.com/maps/embed/v1/directions"
-                    f"?key={api_key}"
-                    f"&origin={encoded_origin}"
-                    f"&destination={encoded_origin}"
-                    f"&waypoints={encoded_destination}"
-                )
+                embed_waypoints.append(final_destination)
+                embed_destination_target = origin
             else:
-                map_url = (
-                    f"https://www.google.com/maps/embed/v1/directions"
-                    f"?key={api_key}"
-                    f"&origin={encoded_origin}"
-                    f"&destination={encoded_destination}"
-                )
+                embed_destination_target = final_destination
+                
+            encoded_embed_waypoints = "|".join([urllib.parse.quote_plus(wp) for wp in embed_waypoints])
             
+            map_url = (
+                f"https://www.google.com/maps/embed/v1/directions"
+                f"?key={api_key}"
+                f"&origin={encoded_origin}"
+                f"&destination={urllib.parse.quote_plus(embed_destination_target)}"
+            )
+            if encoded_embed_waypoints:
+                map_url += f"&waypoints={encoded_embed_waypoints}"
+                
             st.components.v1.iframe(map_url, width=900, height=500)
         else:
             st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
@@ -478,3 +521,7 @@ if not st.session_state.mileage_data.empty:
         st.info("📅 Sheet template journeys are cached. Add a new manual entry above to view the map.")
 else:
     st.write("Add an entry above to generate a live map route.")
+
+
+
+        
