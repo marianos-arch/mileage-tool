@@ -277,93 +277,93 @@ st.markdown("---")
 # --- UI: ADD NEW JOURNEY FORM ---
 st.header("📍 Add New Journey")
 
-# 1. Wrap everything in a form block. Set clear_on_submit=True!
-with st.form("journey_form", clear_on_submit=True):
-    today = datetime.date.today()
-    col_date, col_start, col_dest = st.columns(3)
+# We introduce a generation counter key. Changing this key forces Streamlit 
+# to reset all child widgets cleanly without throwing state modification errors.
+if "form_generation" not in st.session_state:
+    st.session_state.form_generation = 0
 
-    with col_date:
-        travel_date = st.date_input("Date", value=today, key="journey_travel_date")
+gen = st.session_state.form_generation
 
-    with col_start:
-        st.write("**Starting Location**")
-        start_loc = st_searchbox(
+today = datetime.date.today()
+col_date, col_start, col_dest = st.columns(3)
+
+with col_date:
+    travel_date = st.date_input("Date", value=today, key=f"journey_travel_date_{gen}")
+
+with col_start:
+    st.write("**Starting Location**")
+    start_loc = st_searchbox(
+        search_google_places,
+        key=f"start_location_search_{gen}",
+        placeholder="Type starting address..."
+    )
+    
+if "num_stops" not in st.session_state:
+    st.session_state.num_stops = 0
+
+with col_dest:
+    st.write("**Destinations / Stops**")
+    
+    dest_loc = st_searchbox(
+        search_google_places,
+        key=f"destination_search_{gen}",
+        placeholder="Type final destination address..."
+    )
+    
+    additional_stops = []
+    for i in range(st.session_state.num_stops):
+        stop = st_searchbox(
             search_google_places,
-            key="start_location_search",
-            placeholder="Type starting address..."
+            key=f"stop_search_{i}_{gen}",
+            placeholder=f"Type intermediate stop #{i+1}..."
         )
-        
-    if "num_stops" not in st.session_state:
-        st.session_state.num_stops = 0
+        if stop:
+            additional_stops.append(stop)
+            
+    c_add, c_rem = st.columns(2)
+    with c_add:
+        if st.button("➕ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True):
+            st.session_state.num_stops += 1
+            st.rerun()
+    with c_rem:
+        if st.button("➖ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0:
+            st.session_state.num_stops -= 1
+            st.rerun()
 
-    with col_dest:
-        st.write("**Destinations / Stops**")
-        
-        dest_loc = st_searchbox(
-            search_google_places,
-            key="destination_search",
-            placeholder="Type final destination address..."
-        )
-        
-        additional_stops = []
-        for i in range(st.session_state.num_stops):
-            stop = st_searchbox(
-                search_google_places,
-                key=f"stop_search_{i}",
-                placeholder=f"Type intermediate stop #{i+1}..."
-            )
-            if stop:
-                additional_stops.append(stop)
-                
-        # NOTE: Keeping the +/- buttons outside or handling them gracefully.
-        # Buttons inside forms behave as submit buttons unless specified, 
-        # so for dynamic rows it is best to keep them outside or use a clean column layout.
-        c_add, c_rem = st.columns(2)
-        with c_add:
-            if st.button("➕ Add Stop Slot", key="add_stop_btn", use_container_width=True):
-                st.session_state.num_stops += 1
-                st.rerun()
-        with c_rem:
-            if st.button("➖ Remove Stop Slot", key="rem_stop_btn", use_container_width=True) and st.session_state.num_stops > 0:
-                st.session_state.num_stops -= 1
-                st.rerun()
+col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
 
-    col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
+with col_purpose:
+    purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
 
-    with col_purpose:
-        purpose = st.text_input("Purpose of Travel", key="journey_purpose")
+with col_prog_code:
+    program_code = st.text_input(
+        "Program Code",
+        placeholder="e.g., PROG-101",
+        key=f"journey_prog_code_{gen}"
+    )
 
-    with col_prog_code:
-        program_code = st.text_input(
-            "Program Code",
-            placeholder="e.g., PROG-101",
-            key="journey_prog_code"
-        )
+with col_rt:
+    round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key=f"journey_round_trip_{gen}")
 
-    with col_rt:
-        round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key="journey_round_trip")
+st.markdown("##### 🚗 Odometer Sync Settings")
+col_odo_start, col_odo_end = st.columns(2)
 
-    st.markdown("##### 🚗 Odometer Sync Settings")
-    col_odo_start, col_odo_end = st.columns(2)
+with col_odo_start:
+    odo_start_input = st.text_input(
+        "Odometer Start",
+        placeholder="e.g., 45100",
+        key=f"journey_odo_start_{gen}"
+    )
 
-    with col_odo_start:
-        odo_start_input = st.text_input(
-            "Odometer Start",
-            placeholder="e.g., 45100",
-            key="journey_odo_start"
-        )
+with col_odo_end:
+    odo_end_input = st.text_input(
+        "Odometer End",
+        placeholder="e.g., 45125",
+        key=f"journey_odo_end_{gen}"
+    )
 
-    with col_odo_end:
-        odo_end_input = st.text_input(
-            "Odometer End",
-            placeholder="e.g., 45125",
-            key="journey_odo_end"
-        )
+submit_button = st.button("Calculate & Add Entry", type="primary", key=f"journey_submit_btn_{gen}", use_container_width=True)
 
-    # 2. Use st.form_submit_button instead of st.button
-    submit_button = st.form_submit_button("Calculate & Add Entry", type="primary", use_container_width=True)
-
-# 3. Process data outside or inside the block
 if submit_button:
     if not start_loc or not dest_loc:
         st.error("⚠️ Please provide both a Starting Location and Destination.")
@@ -408,7 +408,7 @@ if submit_button:
             o_start, o_end = 0.0, round(calculated_miles, 1)
 
         new_entry = {
-            "Date": travel_date.strftime("%Y-%m-%d"),
+            "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date),
             "Starting Location": start_loc,
             "Destination": combined_destination,
             "Round Trip": round_trip,
@@ -423,12 +423,14 @@ if submit_button:
             ignore_index=True
         )
         
-        # Reset dynamic stop counter state safely
-        st.session_state.num_stops = 0 
+        # CLEANUP: Increment generation to instantly clear out all fields, 
+        # and reset dynamic stop counter back to 0.
+        st.session_state.form_generation += 1
+        st.session_state.num_stops = 0
         
         st.success(f"✅ Added! Distance: {google_miles} miles")
         st.rerun()
-
+        
 st.markdown("---")
 
 # --- UI: MILEAGE LOG TABLE ---
