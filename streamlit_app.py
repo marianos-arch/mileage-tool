@@ -131,6 +131,106 @@ if uploaded_template and st.session_state.uploaded_file_bytes is None:
     except Exception as e:
         st.error(f"Failed to parse workbook: {e}")
 
+#---------
+st.header("AT-PROMISE Excel Template")
+uploaded_template_at_promise = st.file_uploader("Upload your Probation Mileage Shee", type=["xlsx"])
+
+if uploaded_template_at_promise and st.session_state.uploaded_file_bytes is None:
+    st.session_state.uploaded_file_bytes = uploaded_template_at_promise.getvalue()
+
+    try: 
+        wb = openpxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
+
+        # extract sheet 1 metadata
+        sheet1 = wb.worksheets[0]
+        st.session_state.employee_name_p = str(sheet["C3"].value or "").strip()
+        st.session_state.date_range_str_p = str(sheet["E4"].value or "").strp()
+        st.session_state.rate_per_mile = str(sheet["E3"].value or "").strip()
+
+        existing_rows = []
+        row_idx = 9
+
+        while sheet1[f"B{row_idx}"].value:
+            raw_date = sheet1[f"B{row_idx}"].value
+            if isinstance(raw_date, (datetime.date, datetime.datetime)):
+                formatted_date = raw_date.strftime("%Y-%m-%d")
+            else:
+            formatted_date = str(raw_date)[:10]
+            
+            existing_rows.append({
+                "Date": formatted_date, 
+                "Staring Location": IMPORT_MARKER,
+                "Destination": str(sheet1[f"D{row_idx}"].value or "")
+                "Round Trip": "Yes",
+                "Purpose of Travel": str(sheet1[f"E{row_idx}"].value or ""),
+                "Odometer Start": str(sheet1[f"F{row_idx}"].value or ""),
+                "Odometer End": str(sheet1[f"G{row_idx}"].value or ""),
+                "Calculated Mileage": 0,
+            })
+            row_idx += 1
+
+        if existing_rows:
+                st.session_state.mileage_data = pd.DataFrame(existing_rows)
+                st.toast(f"✅ Imported {len(existing_rows)} journey records", icon="📥")
+        
+        st.rerun()
+    except Exception as e:
+        st.error(f"Failed to parse workbook: {e}")
+
+                                                                                
+if uploaded_template and st.session_state.uploaded_file_bytes is None:
+    st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
+    
+    try:
+        wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
+        
+        # Extract Sheet 1 metadata
+        sheet1 = wb.worksheets[0]
+        st.session_state.employee_name = str(sheet1["D11"].value or "").strip()
+        st.session_state.date_range_str = str(sheet1["D15"].value or "").strip()
+    
+        
+        # Extract Sheet 3 journey entries
+        if len(wb.worksheets) >= 3:
+            sheet3 = wb.worksheets[2]
+            existing_rows = []
+            row_idx = 5
+            
+            while sheet3[f"B{row_idx}"].value:
+                raw_date = sheet3[f"B{row_idx}"].value
+                if isinstance(raw_date, (datetime.date, datetime.datetime)):
+                    formatted_date = raw_date.strftime("%Y-%m-%d")
+                else:
+                    formatted_date = str(raw_date)[:10]
+                
+                existing_rows.append({
+                    "Date": formatted_date,
+                    "Starting Location": IMPORT_MARKER,
+                    "Destination": str(sheet3[f"C{row_idx}"].value or ""),
+                    "Round Trip": "Yes",
+                    "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
+                    "Odometer Start": 0,
+                    "Odometer End": 0,
+                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
+                    "Program Code": str(sheet3[f"D{row_idx}"].value or "")
+                })
+                row_idx += 1
+            
+            if existing_rows:
+                st.session_state.mileage_data = pd.DataFrame(existing_rows)
+                st.toast(f"✅ Imported {len(existing_rows)} journey records", icon="📥")
+        
+        st.rerun()
+    except Exception as e:
+        st.error(f"Failed to parse workbook: {e}")
+
+
+
+
+
+
+
+
 st.markdown("---")
 
 # --- UI: COVER SHEET INFO ---
