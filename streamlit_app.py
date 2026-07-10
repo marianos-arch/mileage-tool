@@ -545,7 +545,6 @@ if not st.session_state.mileage_data.empty:
         col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("Route", route_label)
         col_m2.metric("Distance", mileage_label)
-        col_m3.metric("Reimbursement", f"${reimbursement_amount:.2f}")
 
         encoded_origin = urllib.parse.quote_plus(origin)
         encoded_final_destination = urllib.parse.quote_plus(final_destination)
@@ -571,7 +570,7 @@ if not st.session_state.mileage_data.empty:
             st.caption("💡 Click **Print** icon (top-right) or press **Ctrl+P** / **Cmd+P**")
 
         with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles} | Reimbursement: ${reimbursement_amount:.2f}"
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
             
