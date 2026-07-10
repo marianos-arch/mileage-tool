@@ -425,23 +425,34 @@ st.header("📊 Mileage Log")
 
 if not st.session_state.mileage_data.empty:
     total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
-    total_reimbursement = total_miles * st.session_state.rate_per_mile
     
     col_metric1, col_metric2, col_spacer = st.columns([1, 1, 2])
     with col_metric1:
-        st.metric("Total Period Mileage", f"{total_miles} miles")
-    with col_metric2:
-        st.metric("Total Reimbursement", f"${total_reimbursement:.2f}")
+        st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
     
+    # Simple explicit instruction for the team
+    st.caption("💡 **Tip:** The table below is interactive. If the API estimate differs from your odometer or dashboard, double-click the **Calculated Mileage** cell to type the exact number.")
+    
+    # Configuring the column to show it's an editable number
     edited_df = st.data_editor(
         st.session_state.mileage_data,
         num_rows="dynamic",
         use_container_width=True,
-        key="mileage_editor"
+        key="mileage_editor",
+        column_config={
+            "Calculated Mileage": st.column_config.NumberColumn(
+                "Calculated Mileage",
+                help="Google API estimate. Double-click to override with manual app miles if needed.",
+                format="%.1f",
+                min_value=0.0,
+                required=True
+            )
+        }
     )
     st.session_state.mileage_data = edited_df
 else:
     st.info("📝 No mileage entries added yet. Use the form above to get started.")
+
 
 st.markdown("---")
 
@@ -474,6 +485,7 @@ if st.session_state.uploaded_files_registry:
                         
                         for _, row in new_session_rows.iterrows():
                             s1[f"B{current_write_row}"] = row["Date"]
+                            s1[f"C{current_write_row}"] = row["Starting Location"]
                             s1[f"D{current_write_row}"] = row["Destination"]
                             s1[f"E{current_write_row}"] = row["Purpose of Travel"]
                             s1[f"F{current_write_row}"] = row["Odometer Start"]
