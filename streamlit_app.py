@@ -17,6 +17,7 @@ MILEAGE_COLUMNS = [
 ]
 IMPORT_MARKER = "Imported from template"
 METERS_TO_MILES = 0.000621371
+DEFAULT_RATE_PER_MILE = 0.725
 
 # --- API KEY & CLIENT INITIALIZATION ---
 api_key = st.secrets.get("GOOGLE_MAPS_API_KEY", "")
@@ -71,6 +72,8 @@ def init_session_state():
         "employee_name": "",
         "date_range_str": "",
         "uploaded_file_bytes": None,
+        "rate_per_mile": DEFAULT_RATE_PER_MILE,
+        "template_type": "standard",  # "standard" or "at_promise"
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -83,7 +86,7 @@ st.title("🚗 Company Mileage Tracker")
 st.markdown("---")
 
 # --- UI: FILE UPLOAD & INGESTION ---
-st.header("📂 Excel Template")
+st.header("📂 Excel Template Upload")
 uploaded_template = st.file_uploader("Upload your mileage workbook (.xlsx)", type=["xlsx"])
 
 if uploaded_template and st.session_state.uploaded_file_bytes is None:
@@ -92,150 +95,107 @@ if uploaded_template and st.session_state.uploaded_file_bytes is None:
     try:
         wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
         
-        # Extract Sheet 1 metadata
+        # Detect template type by checking cell references
         sheet1 = wb.worksheets[0]
-        st.session_state.employee_name = str(sheet1["D11"].value or "").strip()
-        st.session_state.date_range_str = str(sheet1["D15"].value or "").strip()
+        is_at_promise = False
         
-        # Extract Sheet 3 journey entries
-        if len(wb.worksheets) >= 3:
-            sheet3 = wb.worksheets[2]
-            existing_rows = []
-            row_idx = 5
+        # Check if cells match AT-PROMISE format (C3, E3, E4) vs Standard format (D11, D15)
+        at_promise_check = sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value
+        standard_check = sheet1["D11"].value or sheet1["D15"].value
+        
+        if at_promise_check and not standard_check:
+            is_at_promise = True
+            st.session_state.template_type = "at_promise"
             
-            while sheet3[f"B{row_idx}"].value:
-                raw_date = sheet3[f"B{row_idx}"].value
+            # Extract AT-PROMISE metadata
+            st.session_state.employee_name = str(sheet1["C3"].value or "").strip()
+            st.session_state.date_range_str = str(sheet1["E4"].value or "").strip()
+            
+            try:
+                st.session_state.rate_per_mile = float(sheet1["E3"].value or DEFAULT_RATE_PER_MILE)
+            except (ValueError, TypeError):
+                st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
+            
+            # Extract AT-PROMISE journey entries (starting at row 9)
+            existing_rows = []
+            row_idx = 9
+            
+            while sheet1[f"B{row_idx}"].value:
+                raw_date = sheet1[f"B{row_idx}"].value
                 if isinstance(raw_date, (datetime.date, datetime.datetime)):
                     formatted_date = raw_date.strftime("%Y-%m-%d")
                 else:
                     formatted_date = str(raw_date)[:10]
                 
-                existing_rows.append({
-                    "Date": formatted_date,
-                    "Starting Location": IMPORT_MARKER,
-                    "Destination": str(sheet3[f"C{row_idx}"].value or ""),
-                    "Round Trip": "Yes",
-                    "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
-                    "Odometer Start": 0,
-                    "Odometer End": 0,
-                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
-                    "Program Code": str(sheet3[f"D{row_idx}"].value or "")
-                })
-                row_idx += 1
-            
-            if existing_rows:
-                st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                st.toast(f"✅ Imported {len(existing_rows)} journey records", icon="📥")
-        
-        st.rerun()
-    except Exception as e:
-        st.error(f"Failed to parse workbook: {e}")
-
-#---------
-st.header("AT-PROMISE Excel Template")
-uploaded_template_at_promise = st.file_uploader("Upload your Probation Mileage Shee", type=["xlsx"])
-
-if uploaded_template_at_promise and st.session_state.uploaded_file_bytes is None:
-    st.session_state.uploaded_file_bytes = uploaded_template_at_promise.getvalue()
-
-    try: 
-        wb = openpxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
-
-        # extract sheet 1 metadata
-        sheet1 = wb.worksheets[0]
-        st.session_state.employee_name_p = str(sheet["C3"].value or "").strip()
-        st.session_state.date_range_str_p = str(sheet["E4"].value or "").strp()
-        st.session_state.rate_per_mile = str(sheet["E3"].value or "").strip()
-
-        existing_rows = []
-        row_idx = 9
-
-        while sheet1[f"B{row_idx}"].value:
-            raw_date = sheet1[f"B{row_idx}"].value
-            if isinstance(raw_date, (datetime.date, datetime.datetime)):
-                formatted_date = raw_date.strftime("%Y-%m-%d")
-            else:
-            formatted_date = str(raw_date)[:10]
-            
-            existing_rows.append({
-                "Date": formatted_date, 
-                "Staring Location": IMPORT_MARKER,
-                "Destination": str(sheet1[f"D{row_idx}"].value or "")
-                "Round Trip": "Yes",
-                "Purpose of Travel": str(sheet1[f"E{row_idx}"].value or ""),
-                "Odometer Start": str(sheet1[f"F{row_idx}"].value or ""),
-                "Odometer End": str(sheet1[f"G{row_idx}"].value or ""),
-                "Calculated Mileage": 0,
-            })
-            row_idx += 1
-
-        if existing_rows:
-                st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                st.toast(f"✅ Imported {len(existing_rows)} journey records", icon="📥")
-        
-        st.rerun()
-    except Exception as e:
-        st.error(f"Failed to parse workbook: {e}")
-
-                                                                                
-if uploaded_template and st.session_state.uploaded_file_bytes is None:
-    st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
-    
-    try:
-        wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
-        
-        # Extract Sheet 1 metadata
-        sheet1 = wb.worksheets[0]
-        st.session_state.employee_name = str(sheet1["D11"].value or "").strip()
-        st.session_state.date_range_str = str(sheet1["D15"].value or "").strip()
-    
-        
-        # Extract Sheet 3 journey entries
-        if len(wb.worksheets) >= 3:
-            sheet3 = wb.worksheets[2]
-            existing_rows = []
-            row_idx = 5
-            
-            while sheet3[f"B{row_idx}"].value:
-                raw_date = sheet3[f"B{row_idx}"].value
-                if isinstance(raw_date, (datetime.date, datetime.datetime)):
-                    formatted_date = raw_date.strftime("%Y-%m-%d")
-                else:
-                    formatted_date = str(raw_date)[:10]
+                try:
+                    odo_start = float(sheet1[f"F{row_idx}"].value or 0.0)
+                    odo_end = float(sheet1[f"G{row_idx}"].value or 0.0)
+                    calc_mileage = abs(odo_end - odo_start) if (odo_start and odo_end) else 0.0
+                except (ValueError, TypeError):
+                    odo_start, odo_end = 0.0, 0.0
+                    calc_mileage = 0.0
                 
                 existing_rows.append({
                     "Date": formatted_date,
                     "Starting Location": IMPORT_MARKER,
-                    "Destination": str(sheet3[f"C{row_idx}"].value or ""),
+                    "Destination": str(sheet1[f"D{row_idx}"].value or ""),
                     "Round Trip": "Yes",
-                    "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
-                    "Odometer Start": 0,
-                    "Odometer End": 0,
-                    "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
-                    "Program Code": str(sheet3[f"D{row_idx}"].value or "")
+                    "Purpose of Travel": str(sheet1[f"E{row_idx}"].value or ""),
+                    "Odometer Start": odo_start,
+                    "Odometer End": odo_end,
+                    "Calculated Mileage": round(calc_mileage, 1),
+                    "Program Code": ""
                 })
                 row_idx += 1
             
             if existing_rows:
                 st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                st.toast(f"✅ Imported {len(existing_rows)} journey records", icon="📥")
+                st.toast(f"✅ Imported {len(existing_rows)} journey records from AT-PROMISE template", icon="📥")
+        else:
+            # Standard template format
+            st.session_state.template_type = "standard"
+            st.session_state.employee_name = str(sheet1["D11"].value or "").strip()
+            st.session_state.date_range_str = str(sheet1["D15"].value or "").strip()
+            
+            # Extract Sheet 3 journey entries (standard format)
+            if len(wb.worksheets) >= 3:
+                sheet3 = wb.worksheets[2]
+                existing_rows = []
+                row_idx = 5
+                
+                while sheet3[f"B{row_idx}"].value:
+                    raw_date = sheet3[f"B{row_idx}"].value
+                    if isinstance(raw_date, (datetime.date, datetime.datetime)):
+                        formatted_date = raw_date.strftime("%Y-%m-%d")
+                    else:
+                        formatted_date = str(raw_date)[:10]
+                    
+                    existing_rows.append({
+                        "Date": formatted_date,
+                        "Starting Location": IMPORT_MARKER,
+                        "Destination": str(sheet3[f"C{row_idx}"].value or ""),
+                        "Round Trip": "Yes",
+                        "Purpose of Travel": str(sheet3[f"E{row_idx}"].value or ""),
+                        "Odometer Start": 0,
+                        "Odometer End": 0,
+                        "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
+                        "Program Code": str(sheet3[f"D{row_idx}"].value or "")
+                    })
+                    row_idx += 1
+                
+                if existing_rows:
+                    st.session_state.mileage_data = pd.DataFrame(existing_rows)
+                    st.toast(f"✅ Imported {len(existing_rows)} journey records from Standard template", icon="📥")
         
         st.rerun()
     except Exception as e:
         st.error(f"Failed to parse workbook: {e}")
-
-
-
-
-
-
-
 
 st.markdown("---")
 
 # --- UI: COVER SHEET INFO ---
 st.header("📋 Cover Sheet Information")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns([2, 2, 1])
 
 with col1:
     employee_name = st.text_input(
@@ -246,23 +206,24 @@ with col1:
     )
     st.session_state.employee_name = employee_name
 
-
 with col2:
     months = [
         "January", "February", "March", "April", "May", "June", 
         "July", "August", "September", "October", "November", "December"
     ]
     
-    # Simple dictionary to look up total days in a month for 2026
     month_days = {
         "January": 31, "February": 28, "March": 31, "April": 30, 
         "May": 31, "June": 30, "July": 31, "August": 31, 
         "September": 30, "October": 31, "November": 30, "December": 31
     }
     
-    # Try to find index of previously loaded/saved month string to keep it sticky
-    current_month_name = st.session_state.date_range_str.split(" ")[0]
-    default_idx = months.index(current_month_name) if current_month_name in months else 0
+    # Handle date range parsing safely
+    try:
+        current_month_name = st.session_state.date_range_str.split(" ")[0]
+        default_idx = months.index(current_month_name) if current_month_name in months else 0
+    except (IndexError, ValueError):
+        default_idx = 0
 
     selected_month = st.selectbox(
         "Select Reporting Month (2026)",
@@ -271,13 +232,22 @@ with col2:
         key="cs_month_select"
     )
     
-    # Automatically compute the exact range string (e.g., "July 1 - July 31, 2026")
     days_in_month = month_days[selected_month]
     computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
     
-    # Update state and display read-only for transparency
     st.session_state.date_range_str = computed_range
     st.caption(f"📅 **Formatted Range:** {computed_range}")
+
+with col3:
+    rate_per_mile = st.number_input(
+        "Rate per Mile ($)",
+        value=st.session_state.rate_per_mile,
+        min_value=0.0,
+        step=0.01,
+        format="%.3f",
+        key="cs_rate_per_mile"
+    )
+    st.session_state.rate_per_mile = rate_per_mile
 
 st.markdown("---")
 
@@ -298,21 +268,18 @@ with col_start:
         placeholder="Type starting address..."
     )
     
-# Initialize stop tracking if not present
 if "num_stops" not in st.session_state:
     st.session_state.num_stops = 0
 
 with col_dest:
     st.write("**Destinations / Stops**")
     
-    # Primary/First Destination
     dest_loc = st_searchbox(
         search_google_places,
         key="destination_search",
         placeholder="Type final destination address..."
     )
     
-    # Dynamic Additional Stops
     additional_stops = []
     for i in range(st.session_state.num_stops):
         stop = st_searchbox(
@@ -323,7 +290,6 @@ with col_dest:
         if stop:
             additional_stops.append(stop)
             
-    # Buttons to Add or Remove intermediate stops
     c_add, c_rem = st.columns(2)
     with c_add:
         if st.button("➕ Add Stop", key="add_stop_btn", use_container_width=True):
@@ -333,7 +299,6 @@ with col_dest:
         if st.button("➖ Remove Stop", key="rem_stop_btn", use_container_width=True) and st.session_state.num_stops > 0:
             st.session_state.num_stops -= 1
             st.rerun()
-
 
 col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
 
@@ -373,36 +338,27 @@ if submit_button:
     if not start_loc or not dest_loc:
         st.error("⚠️ Please provide both a Starting Location and Destination.")
     else:
-        # 1. Calculate mileage handling sequential stops sequentially
         current_origin = start_loc
         google_miles = 0.0
         
-        # Calculate through intermediate stops
         for stop in additional_stops:
             google_miles += get_google_distance_miles(current_origin, stop)
             current_origin = stop
             
-        # Final leg to the main destination
         google_miles += get_google_distance_miles(current_origin, dest_loc)
         
         calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles
-        # Maintain exact precision
         calculated_miles = round(calculated_miles, 1)
 
-        # 2. Build the date ramge destinations string in chronological order
         if additional_stops:
-            # Format: Stop 1 -> Stop 2 -> Final Destination
             stops_str = " -> ".join(additional_stops)
             combined_destination = f"{stops_str} -> {dest_loc}"
         else:
             combined_destination = dest_loc
             
-        # Append (RT) to the end of the entire chain if it's a round trip
         if round_trip == "Yes":
             combined_destination = f"{combined_destination} (RT)"
-            
 
-# Helper function to parse input strings to float securely
         def parse_to_float(val):
             try:
                 return round(float(val.strip()), 1)
@@ -412,7 +368,6 @@ if submit_button:
         o_start = parse_to_float(odo_start_input) if odo_start_input.strip() else None
         o_end = parse_to_float(odo_end_input) if odo_end_input.strip() else None
         
-        # Auto-fill odometer fields preserving decimals
         if o_start is not None and o_end is None:
             o_end = round(o_start + calculated_miles, 1)
         elif o_end is not None and o_start is None:
@@ -447,9 +402,13 @@ st.header("📊 Mileage Log")
 
 if not st.session_state.mileage_data.empty:
     total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
-    col_metric, col_spacer = st.columns([1, 3])
-    with col_metric:
+    total_reimbursement = total_miles * st.session_state.rate_per_mile
+    
+    col_metric1, col_metric2, col_spacer = st.columns([1, 1, 2])
+    with col_metric1:
         st.metric("Total Period Mileage", f"{total_miles} miles")
+    with col_metric2:
+        st.metric("Total Reimbursement", f"${total_reimbursement:.2f}")
     
     edited_df = st.data_editor(
         st.session_state.mileage_data,
@@ -466,25 +425,32 @@ st.markdown("---")
 # --- UI: EXPORT TO EXCEL ---
 if st.session_state.uploaded_file_bytes:
     st.subheader("💾 Export Back to Excel Template")
-    st.markdown("Updates `Sheet 1` and `Sheet 3` while preserving formatting.")
+    template_name = "AT-PROMISE" if st.session_state.template_type == "at_promise" else "Standard"
+    st.markdown(f"Updates `Sheet 1` and `Sheet 3` ({template_name} format) while preserving formatting.")
     
     if st.button("Generate Updated Excel Document", type="secondary", use_container_width=True):
         try:
             output_wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes))
             
-            # Update Sheet 1
+            # Update based on template type
             s1 = output_wb.worksheets[0]
-            s1["D11"] = st.session_state.employee_name
-            s1["D15"] = st.session_state.date_range_str
-
-            # Update Sheet 3
-            if len(output_wb.worksheets) >= 3:
-                s3 = output_wb.worksheets[2]
-                current_write_row = 5
+            
+            if st.session_state.template_type == "at_promise":
+                # AT-PROMISE template updates
+                s1["C3"] = st.session_state.employee_name
+                s1["E4"] = st.session_state.date_range_str
+                s1["E3"] = st.session_state.rate_per_mile
                 
-                # Find next empty row
-                while s3[f"B{current_write_row}"].value:
-                    current_write_row += 1
+                # Write journey entries starting at row 9
+                current_write_row = 9
+                
+                # Clear existing entries first
+                for row_idx in range(9, 100):
+                    s1[f"B{row_idx}"].value = None
+                    s1[f"D{row_idx}"].value = None
+                    s1[f"E{row_idx}"].value = None
+                    s1[f"F{row_idx}"].value = None
+                    s1[f"G{row_idx}"].value = None
                 
                 # Write only new entries (exclude imported ones)
                 new_session_rows = st.session_state.mileage_data[
@@ -492,12 +458,38 @@ if st.session_state.uploaded_file_bytes:
                 ]
                 
                 for _, row in new_session_rows.iterrows():
-                    s3[f"B{current_write_row}"] = row["Date"]
-                    s3[f"C{current_write_row}"] = row["Destination"]
-                    s3[f"D{current_write_row}"] = row.get("Program Code", "")
-                    s3[f"E{current_write_row}"] = row["Purpose of Travel"]
-                    s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                    s1[f"B{current_write_row}"] = row["Date"]
+                    s1[f"D{current_write_row}"] = row["Destination"]
+                    s1[f"E{current_write_row}"] = row["Purpose of Travel"]
+                    s1[f"F{current_write_row}"] = row["Odometer Start"]
+                    s1[f"G{current_write_row}"] = row["Odometer End"]
                     current_write_row += 1
+            else:
+                # Standard template updates
+                s1["D11"] = st.session_state.employee_name
+                s1["D15"] = st.session_state.date_range_str
+
+                # Update Sheet 3
+                if len(output_wb.worksheets) >= 3:
+                    s3 = output_wb.worksheets[2]
+                    current_write_row = 5
+                    
+                    # Find next empty row
+                    while s3[f"B{current_write_row}"].value:
+                        current_write_row += 1
+                    
+                    # Write only new entries (exclude imported ones)
+                    new_session_rows = st.session_state.mileage_data[
+                        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
+                    ]
+                    
+                    for _, row in new_session_rows.iterrows():
+                        s3[f"B{current_write_row}"] = row["Date"]
+                        s3[f"C{current_write_row}"] = row["Destination"]
+                        s3[f"D{current_write_row}"] = row.get("Program Code", "")
+                        s3[f"E{current_write_row}"] = row["Purpose of Travel"]
+                        s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                        current_write_row += 1
             
             # Generate download
             excel_stream = BytesIO()
@@ -525,16 +517,13 @@ if not st.session_state.mileage_data.empty:
     ]
 
     if not new_app_entries.empty:
-        # Get the most recent entry
         last_entry = new_app_entries.iloc[-1]
 
         origin = last_entry["Starting Location"]
         raw_destination = str(last_entry["Destination"])
         
-        # Clean out the round-trip flag for URL building
         clean_destination_chain = raw_destination.replace(" (RT)", "")
         
-        # Split out intermediate stops if they exist
         all_dest_legs = [leg.strip() for leg in clean_destination_chain.split(" -> ")]
         final_destination = all_dest_legs[-1]
         intermediate_waypoints = all_dest_legs[:-1] if len(all_dest_legs) > 1 else []
@@ -543,8 +532,8 @@ if not st.session_state.mileage_data.empty:
         is_round_trip = last_entry["Round Trip"] == "Yes"
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
+        reimbursement_amount = trip_miles * st.session_state.rate_per_mile
         
-        # Format UI display labels beautifully
         visual_chain = " ➡️ ".join(all_dest_legs)
         if is_round_trip:
             route_label = f"{origin} ➡️ {visual_chain} 🔄 {origin}"
@@ -554,26 +543,22 @@ if not st.session_state.mileage_data.empty:
             mileage_label = f"{trip_miles} miles (One Way)"
         
         st.subheader("Current Route Detail")
-        col_m1, col_m2 = st.columns(2)
+        col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("Route", route_label)
         col_m2.metric("Distance", mileage_label)
+        col_m3.metric("Reimbursement", f"${reimbursement_amount:.2f}")
 
-        # Encode elements for URLs securely
         encoded_origin = urllib.parse.quote_plus(origin)
         encoded_final_destination = urllib.parse.quote_plus(final_destination)
         
-        # Encode intermediate waypoints for web/map queries
         waypoints_joined = "|".join([urllib.parse.quote_plus(wp) for wp in intermediate_waypoints])
         
-        # 1. Build Direct External Google Maps URL
-        # Format structure mapping parameters: dir/Origin/Waypoint1/Waypoint2/.../Destination
         maps_url_legs = [encoded_origin] + [urllib.parse.quote_plus(wp) for wp in intermediate_waypoints] + [encoded_final_destination]
         if is_round_trip:
             maps_url_legs.append(encoded_origin)
             
         direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/"
         
-        # Action buttons
         st.markdown("##### Actions")
         col_print, col_copy = st.columns(2)
         
@@ -587,15 +572,13 @@ if not st.session_state.mileage_data.empty:
             st.caption("💡 Click **Print** icon (top-right) or press **Ctrl+P** / **Cmd+P**")
 
         with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose}"
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles} | Reimbursement: ${reimbursement_amount:.2f}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
             
         st.markdown("---")
         
-        # 2. Render embedded Map Frame with Waypoint Support
         if gmaps:
-            # Append any intermediate stops + the main destination if it's a round-trip configuration
             embed_waypoints = list(intermediate_waypoints)
             if is_round_trip:
                 embed_waypoints.append(final_destination)
@@ -621,7 +604,3 @@ if not st.session_state.mileage_data.empty:
         st.info("📅 Sheet template journeys are cached. Add a new manual entry above to view the map.")
 else:
     st.write("Add an entry above to generate a live map route.")
-
-
-
-        
