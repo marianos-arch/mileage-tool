@@ -64,77 +64,45 @@ def get_google_distance_miles(origin, destination):
         st.error(f"Error calling Distance Matrix API: {e}")
         return 0.0
 
-# --- SESSION STATE INITIALIZATION ---
-def init_session_state():
-    """Initialize all required session state variables."""
-    defaults = {
-        "mileage_data": pd.DataFrame(columns=MILEAGE_COLUMNS),
-        "employee_name": "",
-        "date_range_str": "",
-        "uploaded_file_bytes": None,
-        "rate_per_mile": DEFAULT_RATE_PER_MILE,
-        "template_type": "standard",  # "standard" or "at_promise"
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-init_session_state()
-
-# --- UI: HEADER ---
-st.title("🚗 Company Mileage Tracker")
-st.markdown("---")
-
-# --- UI: FILE UPLOAD & INGESTION ---
-st.header("📂 Excel Template Upload")
-uploaded_template = st.file_uploader("Upload your mileage workbook (.xlsx)", type=["xlsx"])
-
-if uploaded_template and st.session_state.uploaded_file_bytes is None:
-    st.session_state.uploaded_file_bytes = uploaded_template.getvalue()
-    
+# --- HELPERS: TEMPLATE PROCESSING ---
+def detect_and_extract_workbook(file_bytes, filename):
+    """Detect template type and extract existing journey rows."""
     try:
-        wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes), data_only=True)
-        
-        # Detect template type by checking cell references
+        wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet1 = wb.worksheets[0]
-        is_at_promise = False
         
-        # Check if cells match AT-PROMISE format (C3, E3, E4) vs Standard format (D11, D15)
+        # Detect template type
         at_promise_check = sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value
         standard_check = sheet1["D11"].value or sheet1["D15"].value
         
+        template_type = "standard"
+        employee_name = ""
+        date_range_str = ""
+        rate_per_mile = DEFAULT_RATE_PER_MILE
+        existing_rows = []
+        
         if at_promise_check and not standard_check:
-            is_at_promise = True
-            st.session_state.template_type = "at_promise"
-            
-            # Extract AT-PROMISE metadata
-            st.session_state.employee_name = str(sheet1["C3"].value or "").strip()
-            st.session_state.date_range_str = str(sheet1["E4"].value or "").strip()
-            
+            template_type = "at_promise"
+            employee_name = str(sheet1["C3"].value or "").strip()
+            date_range_str = str(sheet1["E4"].value or "").strip()
             try:
-                st.session_state.rate_per_mile = float(sheet1["E3"].value or DEFAULT_RATE_PER_MILE)
+                rate_per_mile = float(sheet1["E3"].value or DEFAULT_RATE_PER_MILE)
             except (ValueError, TypeError):
-                st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
-            
-            # Extract AT-PROMISE journey entries (starting at row 9)
-            existing_rows = []
+                rate_per_mile = DEFAULT_RATE_PER_MILE
+                
+            # Extract AT-PROMISE journeys (row 9+)
             row_idx = 9
-            
             while sheet1[f"B{row_idx}"].value:
                 raw_date = sheet1[f"B{row_idx}"].value
-                if isinstance(raw_date, (datetime.date, datetime.datetime)):
-                    formatted_date = raw_date.strftime("%Y-%m-%d")
-                else:
-                    formatted_date = str(raw_date)[:10]
+                formatted_date = raw_date.strftime("%Y-%m-%d") if isinstance(raw_date, (datetime.date, datetime.datetime)) else str(raw_date)[:10]
                 
                 try:
                     odo_start = float(sheet1[f"F{row_idx}"].value or 0.0)
                     odo_end = float(sheet1[f"G{row_idx}"].value or 0.0)
                     calc_mileage = abs(odo_end - odo_start) if (odo_start and odo_end) else 0.0
                 except (ValueError, TypeError):
-                    odo_start, odo_end = 0.0, 0.0
-                    calc_mileage = 0.0
-                
+                    odo_start, odo_end, calc_mileage = 0.0, 0.0, 0.0
+                    
                 existing_rows.append({
                     "Date": formatted_date,
                     "Starting Location": IMPORT_MARKER,
@@ -147,28 +115,17 @@ if uploaded_template and st.session_state.uploaded_file_bytes is None:
                     "Program Code": ""
                 })
                 row_idx += 1
-            
-            if existing_rows:
-                st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                st.toast(f"✅ Imported {len(existing_rows)} journey records from AT-PROMISE template", icon="📥")
         else:
-            # Standard template format
-            st.session_state.template_type = "standard"
-            st.session_state.employee_name = str(sheet1["D11"].value or "").strip()
-            st.session_state.date_range_str = str(sheet1["D15"].value or "").strip()
+            # Standard Template Processing
+            employee_name = str(sheet1["D11"].value or "").strip()
+            date_range_str = str(sheet1["D15"].value or "").strip()
             
-            # Extract Sheet 3 journey entries (standard format)
             if len(wb.worksheets) >= 3:
                 sheet3 = wb.worksheets[2]
-                existing_rows = []
                 row_idx = 5
-                
                 while sheet3[f"B{row_idx}"].value:
                     raw_date = sheet3[f"B{row_idx}"].value
-                    if isinstance(raw_date, (datetime.date, datetime.datetime)):
-                        formatted_date = raw_date.strftime("%Y-%m-%d")
-                    else:
-                        formatted_date = str(raw_date)[:10]
+                    formatted_date = raw_date.strftime("%Y-%m-%d") if isinstance(raw_date, (datetime.date, datetime.datetime)) else str(raw_date)[:10]
                     
                     existing_rows.append({
                         "Date": formatted_date,
@@ -182,14 +139,81 @@ if uploaded_template and st.session_state.uploaded_file_bytes is None:
                         "Program Code": str(sheet3[f"D{row_idx}"].value or "")
                     })
                     row_idx += 1
-                
-                if existing_rows:
-                    st.session_state.mileage_data = pd.DataFrame(existing_rows)
-                    st.toast(f"✅ Imported {len(existing_rows)} journey records from Standard template", icon="📥")
-        
-        st.rerun()
+                    
+        return {
+            "filename": filename,
+            "bytes": file_bytes,
+            "template_type": template_type,
+            "employee_name": employee_name,
+            "date_range_str": date_range_str,
+            "rate_per_mile": rate_per_mile,
+            "imported_count": len(existing_rows),
+            "rows": existing_rows
+        }
     except Exception as e:
-        st.error(f"Failed to parse workbook: {e}")
+        st.error(f"Error parsing structural configuration of {filename}: {e}")
+        return None
+
+# --- SESSION STATE INITIALIZATION ---
+def init_session_state():
+    """Initialize all required session state variables."""
+    defaults = {
+        "mileage_data": pd.DataFrame(columns=MILEAGE_COLUMNS),
+        "employee_name": "",
+        "date_range_str": "",
+        "rate_per_mile": DEFAULT_RATE_PER_MILE,
+        "template_type": "standard",  # Backward compatibility field
+        "uploaded_files_registry": {},  # Map filename -> parsed document dict
+        "processed_file_hashes": set()  # Prevent repetitive loop ingestion
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+init_session_state()
+
+# --- UI: HEADER ---
+st.title("🚗 Company Mileage Tracker")
+st.markdown("---")
+
+# --- UI: FILE UPLOAD & INGESTION ---
+st.header("📂 Excel Template Upload")
+uploaded_templates = st.file_uploader(
+    "Upload your mileage workbooks (.xlsx)", 
+    type=["xlsx"], 
+    accept_multiple_files=True
+)
+
+if uploaded_templates:
+    state_updated = False
+    for uploaded_file in uploaded_templates:
+        if uploaded_file.name not in st.session_state.processed_file_hashes:
+            file_bytes = uploaded_file.getvalue()
+            parsed_result = detect_and_extract_workbook(file_bytes, uploaded_file.name)
+            
+            if parsed_result:
+                # Add metadata registry tracker entry
+                st.session_state.uploaded_files_registry[uploaded_file.name] = parsed_result
+                st.session_state.processed_file_hashes.add(uploaded_file.name)
+                
+                # Update singular fields for backward compatibility using the last active file
+                st.session_state.template_type = parsed_result["template_type"]
+                st.session_state.employee_name = parsed_result["employee_name"]
+                st.session_state.date_range_str = parsed_result["date_range_str"]
+                st.session_state.rate_per_mile = parsed_result["rate_per_mile"]
+                
+                # Append rows safely without deleting past histories
+                if parsed_result["rows"]:
+                    new_df = pd.DataFrame(parsed_result["rows"])
+                    st.session_state.mileage_data = pd.concat(
+                        [st.session_state.mileage_data, new_df], 
+                        ignore_index=True
+                    )
+                st.toast(f"📥 Imported {parsed_result['imported_count']} records from {uploaded_file.name} ({parsed_result['template_type'].upper()})")
+                state_updated = True
+                
+    if state_updated:
+        st.rerun()
 
 st.markdown("---")
 
@@ -218,7 +242,6 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
     
-    # Handle date range parsing safely
     try:
         current_month_name = st.session_state.date_range_str.split(" ")[0]
         default_idx = months.index(current_month_name) if current_month_name in months else 0
@@ -423,88 +446,75 @@ else:
 st.markdown("---")
 
 # --- UI: EXPORT TO EXCEL ---
-if st.session_state.uploaded_file_bytes:
-    st.subheader("💾 Export Back to Excel Template")
-    template_name = "AT-PROMISE" if st.session_state.template_type == "at_promise" else "Standard"
-    st.markdown(f"Updates `Sheet 1` and `Sheet 3` ({template_name} format) while preserving formatting.")
+if st.session_state.uploaded_files_registry:
+    st.subheader("💾 Export Back to Excel Templates")
+    st.markdown("Updates cover meta info and appends **only new user manual entries** while preserving template styles.")
     
-    if st.button("Generate Updated Excel Document", type="secondary", use_container_width=True):
-        try:
-            output_wb = openpyxl.load_workbook(BytesIO(st.session_state.uploaded_file_bytes))
-            
-            # Update based on template type
-            s1 = output_wb.worksheets[0]
-            
-            if st.session_state.template_type == "at_promise":
-                # AT-PROMISE template updates
-                s1["C3"] = st.session_state.employee_name
-                s1["E4"] = st.session_state.date_range_str
-                s1["E3"] = st.session_state.rate_per_mile
-                
-                # Write journey entries starting at row 9
-                current_write_row = 9
-                
-                # Clear existing entries first
-                for row_idx in range(9, 100):
-                    s1[f"B{row_idx}"].value = None
-                    s1[f"D{row_idx}"].value = None
-                    s1[f"E{row_idx}"].value = None
-                    s1[f"F{row_idx}"].value = None
-                    s1[f"G{row_idx}"].value = None
-                
-                # Write only new entries (exclude imported ones)
-                new_session_rows = st.session_state.mileage_data[
-                    st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
-                ]
-                
-                for _, row in new_session_rows.iterrows():
-                    s1[f"B{current_write_row}"] = row["Date"]
-                    s1[f"D{current_write_row}"] = row["Destination"]
-                    s1[f"E{current_write_row}"] = row["Purpose of Travel"]
-                    s1[f"F{current_write_row}"] = row["Odometer Start"]
-                    s1[f"G{current_write_row}"] = row["Odometer End"]
-                    current_write_row += 1
-            else:
-                # Standard template updates
-                s1["D11"] = st.session_state.employee_name
-                s1["D15"] = st.session_state.date_range_str
+    # Filter global DataFrame to pull out newly added manual rows
+    new_session_rows = st.session_state.mileage_data[
+        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
+    ]
+    
+    for filename, meta in st.session_state.uploaded_files_registry.items():
+        template_display = "AT-PROMISE" if meta["template_type"] == "at_promise" else "Standard"
+        
+        with st.expander(f"📦 Export Workbook: {filename} ({template_display})", expanded=True):
+            if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
+                try:
+                    output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
+                    s1 = output_wb.worksheets[0]
+                    
+                    if meta["template_type"] == "at_promise":
+                        s1["C3"] = st.session_state.employee_name
+                        s1["E4"] = st.session_state.date_range_str
+                        s1["E3"] = st.session_state.rate_per_mile
+                        
+                        # Find the first blank row following imported data
+                        current_write_row = 9 + meta["imported_count"]
+                        
+                        for _, row in new_session_rows.iterrows():
+                            s1[f"B{current_write_row}"] = row["Date"]
+                            s1[f"D{current_write_row}"] = row["Destination"]
+                            s1[f"E{current_write_row}"] = row["Purpose of Travel"]
+                            s1[f"F{current_write_row}"] = row["Odometer Start"]
+                            s1[f"G{current_write_row}"] = row["Odometer End"]
+                            current_write_row += 1
+                    else:
+                        s1["D11"] = st.session_state.employee_name
+                        s1["D15"] = st.session_state.date_range_str
 
-                # Update Sheet 3
-                if len(output_wb.worksheets) >= 3:
-                    s3 = output_wb.worksheets[2]
-                    current_write_row = 5
+                        if len(output_wb.worksheets) >= 3:
+                            s3 = output_wb.worksheets[2]
+                            current_write_row = 5
+                            # Step past structural headers or prior embedded rows
+                            while s3[f"B{current_write_row}"].value:
+                                current_write_row += 1
+                                
+                            for _, row in new_session_rows.iterrows():
+                                s3[f"B{current_write_row}"] = row["Date"]
+                                s3[f"C{current_write_row}"] = row["Destination"]
+                                s3[f"D{current_write_row}"] = row.get("Program Code", "")
+                                s3[f"E{current_write_row}"] = row["Purpose of Travel"]
+                                s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                                current_write_row += 1
                     
-                    # Find next empty row
-                    while s3[f"B{current_write_row}"].value:
-                        current_write_row += 1
+                    # Convert object workbook properties back into stream output
+                    excel_stream = BytesIO()
+                    output_wb.save(excel_stream)
+                    excel_stream.seek(0)
                     
-                    # Write only new entries (exclude imported ones)
-                    new_session_rows = st.session_state.mileage_data[
-                        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
-                    ]
-                    
-                    for _, row in new_session_rows.iterrows():
-                        s3[f"B{current_write_row}"] = row["Date"]
-                        s3[f"C{current_write_row}"] = row["Destination"]
-                        s3[f"D{current_write_row}"] = row.get("Program Code", "")
-                        s3[f"E{current_write_row}"] = row["Purpose of Travel"]
-                        s3[f"F{current_write_row}"] = row["Calculated Mileage"]
-                        current_write_row += 1
-            
-            # Generate download
-            excel_stream = BytesIO()
-            output_wb.save(excel_stream)
-            excel_stream.seek(0)
-            
-            st.download_button(
-                label="📥 Download Updated Excel File",
-                data=excel_stream,
-                file_name=f"Mileage_Report_{st.session_state.employee_name.replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        except Exception as e:
-            st.error(f"Failed to generate Excel file: {e}")
+                    st.download_button(
+                        label=f"📥 Download Updated {filename}",
+                        data=excel_stream,
+                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_btn_{filename}",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Failed to append records to target workbook {filename}: {e}")
+else:
+    st.info("💡 Upload workbook sheets above to enable matching multi-destination spreadsheet formatting exports.")
 
 st.markdown("---")
 
