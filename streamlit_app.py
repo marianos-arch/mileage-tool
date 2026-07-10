@@ -415,6 +415,22 @@ if submit_button:
             [st.session_state.mileage_data, pd.DataFrame([new_entry])],
             ignore_index=True
         )
+
+        #2 we will manually reset the widget status keys
+        st.session_state.start_location_search = None
+        st.session_state.destination_search = None
+        st.session_state.jorney_purpose = ""
+        # st.session_state.journey_prog_code = ""
+        st.session_state.journey_round_trip = "No"
+        st.session_state.journey_odo_start = ""
+        st.session_state.journey_odo_end = ""
+        st.session_state.num_stops = 0 # Rest intermediate stops counter
+
+        # Clear any dynamic stop searchboxes
+        for k in list(st.session_state.keys()):
+                if k.startswith("stop_search_"):
+                    del st.session_state[k]
+                    
         st.success(f"✅ Added! Distance: {google_miles} miles")
         st.rerun()
 
