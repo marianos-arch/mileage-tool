@@ -532,7 +532,6 @@ if not st.session_state.mileage_data.empty:
         is_round_trip = last_entry["Round Trip"] == "Yes"
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
-        reimbursement_amount = trip_miles * st.session_state.rate_per_mile
         
         visual_chain = " ➡️ ".join(all_dest_legs)
         if is_round_trip:
