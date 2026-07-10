@@ -275,6 +275,7 @@ with col3:
 st.markdown("---")
 
 # --- UI: ADD NEW JOURNEY FORM ---
+# --- UI: ADD NEW JOURNEY FORM ---
 st.header("📍 Add New Journey")
 
 # We introduce a generation counter key. Changing this key forces Streamlit 
