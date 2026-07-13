@@ -19,6 +19,15 @@ IMPORT_MARKER = "Imported from template"
 METERS_TO_MILES = 0.000621371
 DEFAULT_RATE_PER_MILE = 0.725
 
+# Place this somewhere near the top of your code
+COMMON_LOCATIONS = {
+    "Custom / Type Address...": "",
+    "Main Office": "1616 29th St, Bakersfield, CA 93301",
+    "D.E.C": "1130 17th St, Bakersfield, CA 93301",
+    "Delano": "1109 High St., Delano, CA 93215"
+}
+
+
 # --- API KEY & CLIENT INITIALIZATION ---
 api_key = st.secrets.get("GOOGLE_MAPS_API_KEY", "")
 
@@ -293,12 +302,26 @@ with col_date:
 
 with col_start:
     st.write("**Starting Location**")
-    start_loc = st_searchbox(
-        search_google_places,
-        key=f"start_location_search_{gen}",
-        placeholder="Type starting address..."
+    
+    # 1. Add the Quick Select dropdown menu
+    selected_shortcut = st.selectbox(
+        "📍 Quick Select Location",
+        options=list(COMMON_LOCATIONS.keys()),
+        key=f"start_shortcut_{gen}",
+        label_visibility="collapsed" # Hides the label text to keep the UI tight
     )
     
+    # 2. Get the actual street address from your dictionary mapping
+    default_address = COMMON_LOCATIONS[selected_shortcut]
+    
+    # 3. Pass that default address into your searchbox component
+    start_loc = st_searchbox(
+        search_google_places,
+        default=default_address, # This populates the search bar automatically
+        key=f"start_location_search_{gen}",
+        placeholder="Or type custom starting address..."
+    )
+
 if "num_stops" not in st.session_state:
     st.session_state.num_stops = 0
 
