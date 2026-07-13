@@ -618,19 +618,19 @@ if not st.session_state.mileage_data.empty:
         
         # 1. Create a beautiful, card-like container for the journey timeline
         with st.container(border=True):
-            st.markdown(f"**📅 Date of Travel:** `{entry_date}` | **🎯 Purpose:** {entry_purpose}")
+            st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}")
             
             # Construct a clean, modern visual timeline breadcrumb
             timeline_steps = [f"**{origin}** (Start)"]
             for wp in intermediate_waypoints:
-                timeline_steps.append(f"`🏃 Stop: {wp}`")
+                timeline_steps.append(f"`Stop: {wp}`")
             timeline_steps.append(f"**{final_destination}** (Destination)")
             
             if is_round_trip:
                 timeline_steps.append(f"**{origin}** (Return)")
                 
             # Render the timeline with professional arrow indicators
-            st.markdown(" 👉 ".join(timeline_steps))
+            st.markdown(" ".join(timeline_steps))
 
         # 2. Display key trip metadata metrics side-by-side below the timeline card
         col_metric_dist, col_metric_type, col_metric_status = st.columns(3)
