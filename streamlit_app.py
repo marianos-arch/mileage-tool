@@ -16,7 +16,7 @@ MILEAGE_COLUMNS = [
     "Purpose of Travel", "Odometer Start", "Odometer End", "Calculated Mileage", "Program Code"
 ]
 
-IMPORT_MARKER = "Imported from template"
+IMPORT_MARKER = "Imported from template (No Starting Location)"
 METERS_TO_MILES = 0.000621371
 DEFAULT_RATE_PER_MILE = 0.725
 
@@ -133,17 +133,21 @@ def detect_and_extract_workbook(file_bytes, filename):
                     calc_mileage = abs(odo_end - odo_start) if (odo_start and odo_end) else 0.0
                 except (ValueError, TypeError):
                     odo_start, odo_end, calc_mileage = 0.0, 0.0, 0.0
-                    
+
+                excel_start_loc = sheet1[f"C{row_idx}"].value
+                start_location_val = str(excel_start_loc).strip() if excel_start_loc else f"{IMPORT_MARKER} (Probation)"
+    
                 existing_rows.append({
                     "Date": formatted_date,
-                    "Starting Location": IMPORT_MARKER,
+                    "Starting Location": start_location_val, #  Preserves your Excel data!
                     "Destination": str(sheet1[f"D{row_idx}"].value or ""),
                     "Round Trip": "Yes",
                     "Purpose of Travel": str(sheet1[f"E{row_idx}"].value or ""),
                     "Odometer Start": odo_start,
                     "Odometer End": odo_end,
                     "Calculated Mileage": round(calc_mileage, 1),
-                    "Program Code": ""
+                    "Program Code": "",
+                    "_source_file": filename  # Attached for workspace tracking
                 })
                 row_idx += 1
         else:
@@ -712,14 +716,16 @@ st.markdown("---")
 # --- UI: EXPORT TO EXCEL
 if st.session_state.uploaded_files_registry:
     st.subheader("Export Back to Excel Templates")
-    st.markdown("Updates information and adds **only new manual entries** while preserving template.")
+    st.markdown("Updates information and adds **only new manual entries** while preserving template formatting.")
     
+    # Isolate newly recorded rows from this session
     new_session_rows = st.session_state.mileage_data[
-        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
+        st.session_state.mileage_data["_source_file"] == "manual_entry"
     ]
     
+    # Dynamic loop through all active sheet registries (handles unique versions instantly)
     for filename, meta in st.session_state.uploaded_files_registry.items():
-        template_display = "AT-PROMISE" if meta["template_type"] == "at_promise" else "Standard"
+        template_display = "AT-PROMISE (Probation)" if meta["template_type"] == "at_promise" else "Standard (GP)"
         
         with st.expander(f"Export Workbook: {filename} ({template_display})", expanded=True):
             if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
@@ -732,9 +738,7 @@ if st.session_state.uploaded_files_registry:
                         s1["E4"] = st.session_state.date_range_str
                         s1["E3"] = st.session_state.rate_per_mile
                         
-                        # Find the first blank row following imported data
                         current_write_row = 9 + meta["imported_count"]
-                        
                         for _, row in new_session_rows.iterrows():
                             s1[f"B{current_write_row}"] = row["Date"]
                             s1[f"C{current_write_row}"] = row["Starting Location"]
@@ -750,7 +754,6 @@ if st.session_state.uploaded_files_registry:
                         if len(output_wb.worksheets) >= 3:
                             s3 = output_wb.worksheets[2]
                             current_write_row = 5
-                            # Step past structural headers or prior embedded rows
                             while s3[f"B{current_write_row}"].value:
                                 current_write_row += 1
                                 
@@ -762,18 +765,17 @@ if st.session_state.uploaded_files_registry:
                                 s3[f"F{current_write_row}"] = row["Calculated Mileage"]
                                 current_write_row += 1
                     
-                    # Convert object workbook properties back into stream output
                     excel_stream = BytesIO()
                     output_wb.save(excel_stream)
                     excel_stream.seek(0)
+                    
                     today_str = datetime.date.today().strftime("%Y-%m-%d")
                     form_label = "Probation" if meta["template_type"] == "at_promise" else "GP"
 
-                    # Set the simplified filename layout
                     st.download_button(
-                        label=f" Download Updated {filename}",
+                        label=f"📥 Download Updated {filename}",
                         data=excel_stream,
-                        file_name=f"{form_label}_Mileage_{today_str}.xlsx", # e.g., Probation_Mileage_2026-07-13.xlsx
+                        file_name=f"{form_label}_Mileage_{today_str}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_btn_{filename}",
                         use_container_width=True
@@ -781,11 +783,9 @@ if st.session_state.uploaded_files_registry:
                 except Exception as e:
                     st.error(f"Failed to append records to target workbook {filename}: {e}")
 else:
-    st.info(" Upload excel sheets above to enable spreadsheet exports.")
+    st.info("Upload excel sheets above to enable spreadsheet exports.")
 
 st.markdown("---")
-
-
 
 
 
