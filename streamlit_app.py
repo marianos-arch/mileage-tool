@@ -120,7 +120,12 @@ def detect_and_extract_workbook(file_bytes, filename):
             row_idx = 9
             while sheet1[f"B{row_idx}"].value:
                 raw_date = sheet1[f"B{row_idx}"].value
-                formatted_date = raw_date.strftime("%Y-%m-%d") if isinstance(raw_date, (datetime.date, datetime.datetime)) else str(raw_date)[:10]
+                try:
+                    # Safely converts strings like "1/15/26" or datetime objects into a clean YYYY-MM-DD string
+                    formatted_date = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
+                except Exception:
+                    # Fallback if the cell is corrupted or unparseable text
+                    formatted_date = str(raw_date)[:10] if raw_date else ""
                 
                 try:
                     odo_start = float(sheet1[f"F{row_idx}"].value or 0.0)
@@ -151,8 +156,11 @@ def detect_and_extract_workbook(file_bytes, filename):
                 row_idx = 5
                 while sheet3[f"B{row_idx}"].value:
                     raw_date = sheet3[f"B{row_idx}"].value
-                    formatted_date = raw_date.strftime("%Y-%m-%d") if isinstance(raw_date, (datetime.date, datetime.datetime)) else str(raw_date)[:10]
-                    
+                    try:
+                        formatted_date = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
+                    except Exception:
+                        formatted_date = str(raw_date)[:10] if raw_date else ""
+                        
                     existing_rows.append({
                         "Date": formatted_date,
                         "Starting Location": IMPORT_MARKER,
