@@ -570,11 +570,12 @@ if st.session_state.uploaded_files_registry:
                     excel_stream = BytesIO()
                     output_wb.save(excel_stream)
                     excel_stream.seek(0)
+                    today_str = datetime.date.today().strftime("%Y-%m-%d")
                     
                     st.download_button(
                         label=f" Download Updated {filename}",
                         data=excel_stream,
-                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}",
+                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}_{today_str}",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_btn_{filename}",
                         use_container_width=True
