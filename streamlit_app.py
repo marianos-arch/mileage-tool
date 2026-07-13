@@ -542,80 +542,6 @@ else:
 
 st.markdown("---")
 
-# --- UI: EXPORT TO EXCEL ---
-if st.session_state.uploaded_files_registry:
-    st.subheader("Export Back to Excel Templates")
-    st.markdown("Updates information and adds **only new manual entries** while preserving template.")
-    
-    # Filter global DataFrame to pull out newly added manual rows
-    new_session_rows = st.session_state.mileage_data[
-        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
-    ]
-    
-    for filename, meta in st.session_state.uploaded_files_registry.items():
-        template_display = "AT-PROMISE" if meta["template_type"] == "at_promise" else "Standard"
-        
-        with st.expander(f"Export Workbook: {filename} ({template_display})", expanded=True):
-            if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
-                try:
-                    output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
-                    s1 = output_wb.worksheets[0]
-                    
-                    if meta["template_type"] == "at_promise":
-                        s1["C3"] = st.session_state.employee_name
-                        s1["E4"] = st.session_state.date_range_str
-                        s1["E3"] = st.session_state.rate_per_mile
-                        
-                        # Find the first blank row following imported data
-                        current_write_row = 9 + meta["imported_count"]
-                        
-                        for _, row in new_session_rows.iterrows():
-                            s1[f"B{current_write_row}"] = row["Date"]
-                            s1[f"C{current_write_row}"] = row["Starting Location"]
-                            s1[f"D{current_write_row}"] = row["Destination"]
-                            s1[f"E{current_write_row}"] = row["Purpose of Travel"]
-                            s1[f"F{current_write_row}"] = row["Odometer Start"]
-                            s1[f"G{current_write_row}"] = row["Odometer End"]
-                            current_write_row += 1
-                    else:
-                        s1["D11"] = st.session_state.employee_name
-                        s1["D15"] = st.session_state.date_range_str
-
-                        if len(output_wb.worksheets) >= 3:
-                            s3 = output_wb.worksheets[2]
-                            current_write_row = 5
-                            # Step past structural headers or prior embedded rows
-                            while s3[f"B{current_write_row}"].value:
-                                current_write_row += 1
-                                
-                            for _, row in new_session_rows.iterrows():
-                                s3[f"B{current_write_row}"] = row["Date"]
-                                s3[f"C{current_write_row}"] = row["Destination"]
-                                s3[f"D{current_write_row}"] = row.get("Program Code", "")
-                                s3[f"E{current_write_row}"] = row["Purpose of Travel"]
-                                s3[f"F{current_write_row}"] = row["Calculated Mileage"]
-                                current_write_row += 1
-                    
-                    # Convert object workbook properties back into stream output
-                    excel_stream = BytesIO()
-                    output_wb.save(excel_stream)
-                    excel_stream.seek(0)
-                    today_str = datetime.date.today().strftime("%Y-%m-%d")
-                    
-                    st.download_button(
-                        label=f" Download Updated {filename}",
-                        data=excel_stream,
-                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}_{today_str}",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"dl_btn_{filename}",
-                        use_container_width=True
-                    )
-                except Exception as e:
-                    st.error(f"Failed to append records to target workbook {filename}: {e}")
-else:
-    st.info(" Upload excel sheets above to enable spreadsheet exports.")
-
-st.markdown("---")
 
 # --- UI: ROUTE MAP & PRINT VIEW ---
 st.header("Route Map & Print View")
@@ -764,3 +690,88 @@ if not st.session_state.mileage_data.empty:
         st.info("Sheet template journeys are uploaded. Add a new manual entry above to view the map.")
 else:
     st.write("Add an entry above to generate a live map route.")
+
+# --- UI: EXPORT TO EXCEL ---
+if st.session_state.uploaded_files_registry:
+    st.subheader("Export Back to Excel Templates")
+    st.markdown("Updates information and adds **only new manual entries** while preserving template.")
+    
+    # Filter global DataFrame to pull out newly added manual rows
+    new_session_rows = st.session_state.mileage_data[
+        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
+    ]
+    
+    for filename, meta in st.session_state.uploaded_files_registry.items():
+        template_display = "AT-PROMISE" if meta["template_type"] == "at_promise" else "Standard"
+        
+        with st.expander(f"Export Workbook: {filename} ({template_display})", expanded=True):
+            if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
+                try:
+                    output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
+                    s1 = output_wb.worksheets[0]
+                    
+                    if meta["template_type"] == "at_promise":
+                        s1["C3"] = st.session_state.employee_name
+                        s1["E4"] = st.session_state.date_range_str
+                        s1["E3"] = st.session_state.rate_per_mile
+                        
+                        # Find the first blank row following imported data
+                        current_write_row = 9 + meta["imported_count"]
+                        
+                        for _, row in new_session_rows.iterrows():
+                            s1[f"B{current_write_row}"] = row["Date"]
+                            s1[f"C{current_write_row}"] = row["Starting Location"]
+                            s1[f"D{current_write_row}"] = row["Destination"]
+                            s1[f"E{current_write_row}"] = row["Purpose of Travel"]
+                            s1[f"F{current_write_row}"] = row["Odometer Start"]
+                            s1[f"G{current_write_row}"] = row["Odometer End"]
+                            current_write_row += 1
+                    else:
+                        s1["D11"] = st.session_state.employee_name
+                        s1["D15"] = st.session_state.date_range_str
+
+                        if len(output_wb.worksheets) >= 3:
+                            s3 = output_wb.worksheets[2]
+                            current_write_row = 5
+                            # Step past structural headers or prior embedded rows
+                            while s3[f"B{current_write_row}"].value:
+                                current_write_row += 1
+                                
+                            for _, row in new_session_rows.iterrows():
+                                s3[f"B{current_write_row}"] = row["Date"]
+                                s3[f"C{current_write_row}"] = row["Destination"]
+                                s3[f"D{current_write_row}"] = row.get("Program Code", "")
+                                s3[f"E{current_write_row}"] = row["Purpose of Travel"]
+                                s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                                current_write_row += 1
+                    
+                    # Convert object workbook properties back into stream output
+                    excel_stream = BytesIO()
+                    output_wb.save(excel_stream)
+                    excel_stream.seek(0)
+                    today_str = datetime.date.today().strftime("%Y-%m-%d")
+                    
+                    st.download_button(
+                        label=f" Download Updated {filename}",
+                        data=excel_stream,
+                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}_{today_str}",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_btn_{filename}",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Failed to append records to target workbook {filename}: {e}")
+else:
+    st.info(" Upload excel sheets above to enable spreadsheet exports.")
+
+st.markdown("---")
+
+
+
+
+
+
+
+
+
+
