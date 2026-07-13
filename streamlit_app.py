@@ -53,7 +53,7 @@ def search_google_places(query_text):
         bakersfield_coords = (35.3733, -119.0187)
         
         # 50,000 meters = approx 31 miles around Bakersfield
-        search_radius = 70000 
+        search_radius = 50000 
         
         # Request predictions with local geographical bias
         predictions = gmaps.places_autocomplete(
