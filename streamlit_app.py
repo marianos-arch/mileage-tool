@@ -303,24 +303,28 @@ with col_date:
 with col_start:
     st.write("**Starting Location**")
     
-    # 1. Add the Quick Select dropdown menu
+    # 1. Quick Select Dropdown Menu
     selected_shortcut = st.selectbox(
         "📍 Quick Select Location",
         options=list(COMMON_LOCATIONS.keys()),
         key=f"start_shortcut_{gen}",
-        label_visibility="collapsed" # Hides the label text to keep the UI tight
+        label_visibility="collapsed"
     )
     
-    # 2. Get the actual street address from your dictionary mapping
-    default_address = COMMON_LOCATIONS[selected_shortcut]
-    
-    # 3. Pass that default address into your searchbox component
-    start_loc = st_searchbox(
-        search_google_places,
-        default=default_address, # This populates the search bar automatically
-        key=f"start_location_search_{gen}",
-        placeholder="Or type custom starting address..."
-    )
+    # 2. Check the user's choice
+    if selected_shortcut == "Custom / Type Address...":
+        # Show the interactive search box if they want a custom route
+        start_loc = st_searchbox(
+            search_google_places,
+            key=f"start_location_search_{gen}",
+            placeholder="Type custom starting address..."
+        )
+    else:
+        # Hide the search box and automatically set start_loc to the preset address
+        start_loc = COMMON_LOCATIONS[selected_shortcut]
+        
+        # Display a clean informational badge so they know what address is active
+        st.info(f"🏢 **Using:** {start_loc}")
 
 if "num_stops" not in st.session_state:
     st.session_state.num_stops = 0
