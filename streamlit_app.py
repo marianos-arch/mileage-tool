@@ -203,7 +203,7 @@ st.title("GP Mileage Tracker")
 st.markdown("---")
 
 # --- UI: FILE UPLOAD & INGESTION ---
-st.header("Mileage Excel Template Upload")
+st.header("Mileage Excel Template Upload 🗂️")
 uploaded_templates = st.file_uploader(
     "Upload your mileage excel sheet (.xlsx)", 
     type=["xlsx"], 
@@ -346,7 +346,7 @@ if "num_stops" not in st.session_state:
     st.session_state.num_stops = 0
 
 with col_dest:
-    st.write("**Destinations / Stops**")
+    st.write("**Final Destination**")
     
     dest_loc = st_searchbox(
         search_google_places,
