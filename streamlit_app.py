@@ -505,60 +505,6 @@ if submit_button:
         
 st.markdown("---")
 
-# --- UI: MILEAGE LOG TABLE
-st.header("Mileage Log Table")
-
-if not st.session_state.mileage_data.empty:
-    total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
-    
-    col_metric1, col_metric2, col_spacer = st.columns([1, 1, 2])
-    with col_metric1:
-        st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
-    
-    st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
-
-# DYNAMIC COLUMNS: Determine which columns to display or hide
-    if st.session_state.template_type == "at_promise":
-        # Show everything including Odometer tracking fields
-        display_columns = MILEAGE_COLUMNS
-        column_configuration = {
-            "Calculated Mileage": st.column_config.NumberColumn(
-                "Calculated Mileage",
-                help="Double-click to override with manual app miles if needed.",
-                format="%.1f",
-                min_value=0.0,
-                required=True
-            )
-        }
-    else:
-        # Standard sheet layout: Filter out Odometer fields entirely from view
-        display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
-        column_configuration = {
-            "Calculated Mileage": st.column_config.NumberColumn(
-                "Calculated Mileage",
-                help="Double-click to override with manual app miles if needed.",
-                format="%.1f",
-                min_value=0.0,
-                required=True
-            )
-        }
-    
-    edited_df = st.data_editor(
-        st.session_state.mileage_data,
-        column_order=display_columns, # This controls visible columns and ordering dynamically!
-        num_rows="dynamic",
-        use_container_width=True,
-        key="mileage_editor",
-        column_config=column_configuration
-    )
-    st.session_state.mileage_data = edited_df
-else:
-    st.info(" No mileage entries added yet. Use the form above to get started.")
-
-
-st.markdown("---")
-
-
 # --- UI: ROUTE MAP & PRINT VIEW
 st.header("Route Map & Print View")
 
@@ -709,6 +655,59 @@ else:
 
 st.markdown("---")
 
+
+# --- UI: MILEAGE LOG TABLE
+st.header("Mileage Log Table")
+
+if not st.session_state.mileage_data.empty:
+    total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
+    
+    col_metric1, col_metric2, col_spacer = st.columns([1, 1, 2])
+    with col_metric1:
+        st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
+    
+    st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
+
+# DYNAMIC COLUMNS: Determine which columns to display or hide
+    if st.session_state.template_type == "at_promise":
+        # Show everything including Odometer tracking fields
+        display_columns = MILEAGE_COLUMNS
+        column_configuration = {
+            "Calculated Mileage": st.column_config.NumberColumn(
+                "Calculated Mileage",
+                help="Double-click to override with manual app miles if needed.",
+                format="%.1f",
+                min_value=0.0,
+                required=True
+            )
+        }
+    else:
+        # Standard sheet layout: Filter out Odometer fields entirely from view
+        display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
+        column_configuration = {
+            "Calculated Mileage": st.column_config.NumberColumn(
+                "Calculated Mileage",
+                help="Double-click to override with manual app miles if needed.",
+                format="%.1f",
+                min_value=0.0,
+                required=True
+            )
+        }
+    
+    edited_df = st.data_editor(
+        st.session_state.mileage_data,
+        column_order=display_columns, # This controls visible columns and ordering dynamically!
+        num_rows="dynamic",
+        use_container_width=True,
+        key="mileage_editor",
+        column_config=column_configuration
+    )
+    st.session_state.mileage_data = edited_df
+else:
+    st.info(" No mileage entries added yet. Use the form above to get started.")
+
+
+st.markdown("---")
 
 # --- UI: EXPORT TO EXCEL
 if st.session_state.uploaded_files_registry:
