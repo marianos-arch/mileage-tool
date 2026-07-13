@@ -7,28 +7,29 @@ from streamlit_searchbox import st_searchbox
 import openpyxl
 from io import BytesIO
 
-# --- PAGE CONFIG ---
+# --- PAGE CONFIG
 st.set_page_config(page_title="GP Mileage Tool", layout="wide")
 
-# --- CONSTANTS ---
+# --- CONSTANTS
 MILEAGE_COLUMNS = [
     "Date", "Starting Location", "Destination", "Round Trip",
     "Purpose of Travel", "Odometer Start", "Odometer End", "Calculated Mileage", "Program Code"
 ]
+
 IMPORT_MARKER = "Imported from template"
 METERS_TO_MILES = 0.000621371
 DEFAULT_RATE_PER_MILE = 0.725
 
-# Place this somewhere near the top of your code
+# Common locations to select from
 COMMON_LOCATIONS = {
     "Custom / Type Address...": "",
     "Main Office": "1616 29th St, Bakersfield, CA 93301",
     "DEC": "1130 17th St, Bakersfield, CA 93301",
     "Delano": "1109 High St., Delano, CA 93215"
 }
+# Common Locations can be added
 
-
-# --- API KEY & CLIENT INITIALIZATION ---
+# --- API KEY & CLIENT INITIALIZATION
 api_key = st.secrets.get("GOOGLE_MAPS_API_KEY", "")
 
 @st.cache_resource
@@ -43,27 +44,26 @@ def get_gmaps_client(key):
 
 gmaps = get_gmaps_client(api_key)
 
-# --- GOOGLE PLACES AUTOCOMPLETE ---
+# --- GOOGLE PLACES AUTOCOMPLETE
 
 def search_google_places(query_text):
     if not query_text or not gmaps:
         return []
     try:
-        # Bakersfield Coordinates: 35.3733° N, -119.0187° W
+        # Bakersfield Coordinates
         bakersfield_coords = (35.3733, -119.0187)
         
-        # 50,000 meters = approx 31 miles around Bakersfield
+        # approx 31 miles around Bakersfield
         search_radius = 50000 
         
-        # Request predictions with local geographical bias
+        # predictions with local geographical bias
         predictions = gmaps.places_autocomplete(
             input_text=query_text,
             location=bakersfield_coords,
             radius=search_radius,
-            components={"country": "us"} # Limits results strictly to the USA
+            components={"country": "us"} # Limits USA
         )
         
-        # Format the predictions for your st_searchbox to display
         return [p['description'] for p in predictions]
         
     except Exception as e:
@@ -71,7 +71,7 @@ def search_google_places(query_text):
         return []
 
 
-# --- GOOGLE DISTANCE MATRIX API ---
+# --- GOOGLE DISTANCE MATRIX API 
 def get_google_distance_miles(origin, destination):
     """Get driving distance in miles from Google Distance Matrix API."""
     if not gmaps:
@@ -90,14 +90,14 @@ def get_google_distance_miles(origin, destination):
         st.error(f"Error calling Distance Matrix API: {e}")
         return 0.0
 
-# --- HELPERS: TEMPLATE PROCESSING ---
+# --- HELPERS: TEMPLATE PROCESSING
 def detect_and_extract_workbook(file_bytes, filename):
     """Detect template type and extract existing journey rows."""
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet1 = wb.worksheets[0]
         
-        # Detect template type
+        # this will detect template type
         at_promise_check = sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value
         standard_check = sheet1["D11"].value or sheet1["D15"].value
         
@@ -116,15 +116,15 @@ def detect_and_extract_workbook(file_bytes, filename):
             except (ValueError, TypeError):
                 rate_per_mile = DEFAULT_RATE_PER_MILE
                 
-            # Extract AT-PROMISE journeys (row 9+)
+            # This will extract AT-PROMISE journeys (row 9+)
             row_idx = 9
             while sheet1[f"B{row_idx}"].value:
                 raw_date = sheet1[f"B{row_idx}"].value
                 try:
-                    # Safely converts strings like "1/15/26" or datetime objects into a clean YYYY-MM-DD string
+                    # Safetly converts strings like "1/15/26" or datetime objects into a clean YYYY-MM-DD string
                     formatted_date = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
                 except Exception:
-                    # Fallback if the cell is corrupted or unparseable text
+                    # fallback if the cell is corrupted or unparseable text
                     formatted_date = str(raw_date)[:10] if raw_date else ""
                 
                 try:
@@ -147,7 +147,7 @@ def detect_and_extract_workbook(file_bytes, filename):
                 })
                 row_idx += 1
         else:
-            # Standard Template Processing
+            # Standard Garden Pathways Template Processing
             employee_name = str(sheet1["D11"].value or "").strip()
             date_range_str = str(sheet1["D15"].value or "").strip()
             
@@ -188,7 +188,7 @@ def detect_and_extract_workbook(file_bytes, filename):
         st.error(f"Error parsing structural configuration of {filename}: {e}")
         return None
 
-# --- SESSION STATE INITIALIZATION ---
+# --- SESSION STATE INITIALIZATION
 def init_session_state():
     """Initialize all required session state variables."""
     defaults = {
@@ -196,9 +196,9 @@ def init_session_state():
         "employee_name": "",
         "date_range_str": "",
         "rate_per_mile": DEFAULT_RATE_PER_MILE,
-        "template_type": "standard",  # Backward compatibility field
+        "template_type": "standard",  # This creates a backwards compatibility field
         "uploaded_files_registry": {},  # Map filename -> parsed document dict
-        "processed_file_hashes": set()  # Prevent repetitive loop ingestion
+        "processed_file_hashes": set() 
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -206,11 +206,11 @@ def init_session_state():
 
 init_session_state()
 
-# --- UI: HEADER ---
+# --- UI: HEADER
 st.title("GP Mileage Tracker")
 st.markdown("---")
 
-# --- UI: FILE UPLOAD & INGESTION ---
+# --- UI: FILE UPLOAD & INGESTION
 st.header("Mileage Excel Template Upload 🗂️")
 uploaded_templates = st.file_uploader(
     "Upload your mileage excel sheet (.xlsx)", 
@@ -226,17 +226,16 @@ if uploaded_templates:
             parsed_result = detect_and_extract_workbook(file_bytes, uploaded_file.name)
             
             if parsed_result:
-                # Add metadata registry tracker entry
                 st.session_state.uploaded_files_registry[uploaded_file.name] = parsed_result
                 st.session_state.processed_file_hashes.add(uploaded_file.name)
                 
-                # Update singular fields for backward compatibility using the last active file
+                # singular fields for backward compatibility using the last active file
                 st.session_state.template_type = parsed_result["template_type"]
                 st.session_state.employee_name = parsed_result["employee_name"]
                 st.session_state.date_range_str = parsed_result["date_range_str"]
                 st.session_state.rate_per_mile = parsed_result["rate_per_mile"]
                 
-                # Append rows safely without deleting past histories
+                # Adds in rows safely without deleting past histories
                 if parsed_result["rows"]:
                     new_df = pd.DataFrame(parsed_result["rows"])
                     st.session_state.mileage_data = pd.concat(
@@ -251,7 +250,7 @@ if uploaded_templates:
 
 st.markdown("---")
 
-# --- UI: COVER SHEET INFO ---
+# --- UI: COVER SHEET INFO
 st.header("Mileage Cover Sheet Information")
 col1, col2, col3 = st.columns([2, 2, 1])
 
@@ -296,7 +295,7 @@ with col2:
     st.caption(f" **Formatted Range:** {computed_range}")
 
 with col3:
-    # Check if the uploaded sheet is AT-PROMISE
+    # Check if the uploaded sheet is AT-PROMISE Probation Form
     if st.session_state.template_type == "at_promise":
         rate_per_mile = st.number_input(
             "Rate per Mile ($)",
@@ -308,12 +307,12 @@ with col3:
         )
         st.session_state.rate_per_mile = rate_per_mile
     else:
-        # If standard sheet, quietly keep the default rate without showing the box
+        # If its a GP standard sheet, quietly keep the default rate without showing the box
         st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
 
 st.markdown("---")
 
-# --- UI: ADD NEW JOURNEY FORM ---
+# --- UI: ADD NEW JOURNEY FORM 
 st.header(" Add New Mileage Entry")
 
 # We introduce a generation counter key
@@ -332,7 +331,7 @@ with col_date:
 with col_start:
     st.write("**Starting Location**")
     
-    # 1. Quick Select Dropdown Menu
+    # quick Select Dropdown Menu
     selected_shortcut = st.selectbox(
         "Quick Select Location",
         options=list(COMMON_LOCATIONS.keys()),
@@ -340,19 +339,18 @@ with col_start:
         label_visibility="collapsed"
     )
     
-    # 2. Check the user's choice
+    # Chheck the user's choice
     if selected_shortcut == "Custom / Type Address...":
-        # Show the interactive search box if they want a custom route
+        # Show the interactive search box if they want a custom route (Simple to hide it)
         start_loc = st_searchbox(
             search_google_places,
             key=f"start_location_search_{gen}",
             placeholder="Type custom starting address..."
         )
     else:
-        # Hide the search box and automatically set start_loc to the preset address
+        # Hide the search box
         start_loc = COMMON_LOCATIONS[selected_shortcut]
         
-        # Display a clean informational badge so they know what address is active
         st.info(f"**Using:** {start_loc}")
 
 if "num_stops" not in st.session_state:
@@ -361,27 +359,22 @@ if "num_stops" not in st.session_state:
 with col_dest:
     st.write("**Final Destination**")
     
-    # 1. Quick Select Dropdown Menu for Destination
     selected_dest_shortcut = st.selectbox(
         "Quick Select Destination",
         options=list(COMMON_LOCATIONS.keys()),
         key=f"dest_shortcut_{gen}",
         label_visibility="collapsed"
     )
-    
-    # 2. Check the user's choice and conditionally toggle visibility
+
     if selected_dest_shortcut == "Custom / Type Address...":
-        # Show interactive search box if they want a custom destination
         dest_loc = st_searchbox(
             search_google_places,
             key=f"destination_search_{gen}",
             placeholder="Type final destination address..."
         )
     else:
-        # Hide the search box and automatically set dest_loc to the preset address
         dest_loc = COMMON_LOCATIONS[selected_dest_shortcut]
         
-        # Display a clean informational badge
         st.info(f"**Using:** {dest_loc}")
         
     additional_stops = []
@@ -419,7 +412,7 @@ with col_prog_code:
 with col_rt:
     round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key=f"journey_round_trip_{gen}")
 
-# Wrap the entire odometer block so it completely vanishes for standard sheets
+# the entire odometer block will completely vanishes for standard sheets
 if st.session_state.template_type == "at_promise":
     st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
     col_odo_start, col_odo_end = st.columns(2)
@@ -438,7 +431,7 @@ if st.session_state.template_type == "at_promise":
             key=f"journey_odo_end_{gen}"
         )
 else:
-    # If standard, pass empty strings so your calculation logic defaults safely to Scenario D
+    # If standard, pass empty strings
     odo_start_input = ""
     odo_end_input = ""
 
@@ -503,7 +496,6 @@ if submit_button:
             ignore_index=True
         )
         
-        # CLEANUP: Increment generation to instantly clear out all fields, 
         # and reset dynamic stop counter back to 0.
         st.session_state.form_generation += 1
         st.session_state.num_stops = 0
@@ -513,7 +505,7 @@ if submit_button:
         
 st.markdown("---")
 
-# --- UI: MILEAGE LOG TABLE ---
+# --- UI: MILEAGE LOG TABLE
 st.header("Mileage Log Table")
 
 if not st.session_state.mileage_data.empty:
@@ -525,7 +517,7 @@ if not st.session_state.mileage_data.empty:
     
     st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
 
-# 2. DYNAMIC COLUMNS: Determine which columns to display or hide
+# DYNAMIC COLUMNS: Determine which columns to display or hide
     if st.session_state.template_type == "at_promise":
         # Show everything including Odometer tracking fields
         display_columns = MILEAGE_COLUMNS
@@ -551,10 +543,9 @@ if not st.session_state.mileage_data.empty:
             )
         }
     
-    # Render the data editor using our dynamic configurations
     edited_df = st.data_editor(
         st.session_state.mileage_data,
-        column_order=display_columns, # Controls visible columns and ordering dynamically!
+        column_order=display_columns, # This controls visible columns and ordering dynamically!
         num_rows="dynamic",
         use_container_width=True,
         key="mileage_editor",
@@ -568,7 +559,7 @@ else:
 st.markdown("---")
 
 
-# --- UI: ROUTE MAP & PRINT VIEW ---
+# --- UI: ROUTE MAP & PRINT VIEW
 st.header("Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
@@ -593,14 +584,13 @@ if not st.session_state.mileage_data.empty:
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
 
-        # --- REVAMPED STEP 3: VISUAL ROUTE TIMELINE & KEY METRICS ---
+        #  VISUAL ROUTE TIMELINE & KEY METRICS 
         st.subheader("Current Route Detail")
         
-        # 1. Create a beautiful, card-like container for the journey timeline
         with st.container(border=True):
             st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}")
             
-            # Construct a clean, modern visual timeline breadcrumb
+            #  a clean modern visual timeline 
             timeline_steps = [f"**{origin}** (Start)->"]
             for wp in intermediate_waypoints:
                 timeline_steps.append(f"`Stop: {wp}`")
@@ -609,10 +599,9 @@ if not st.session_state.mileage_data.empty:
             if is_round_trip:
                 timeline_steps.append(f" **{origin}** (RT)")
                 
-            # Render the timeline with professional arrow indicators
+            # the timeline with arrow indicators
             st.markdown(" ".join(timeline_steps))
 
-        # 2. Display key trip metadata metrics side-by-side below the timeline card
         col_metric_dist, col_metric_type, col_metric_status = st.columns(3)
         
         with col_metric_dist:
@@ -628,7 +617,7 @@ if not st.session_state.mileage_data.empty:
             )
             
         with col_metric_status:
-            # Displays the active destination endpoint cleanly
+            # display the active destination endpoint cleanly
             st.metric(
                 label="Final Stop", 
                 value=final_destination if not is_round_trip else "Returned Back",
@@ -671,13 +660,13 @@ if not st.session_state.mileage_data.empty:
         else:
             st.warning("Please add a valid Google Maps API Key.")
             
-        # --- LIVE MAP OVERRIDE ---
+ # --- LIVE MAP OVERRIDE
         st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
         
-        # Get the current index of the row we are looking at
+        # This will get the current index of the row we are looking at
         last_entry_index = new_app_entries.index[-1]
         
-        # Display a number input pre-filled with the current mileage
+        # This will display a number input pre-filled with the current mileage
         adjusted_miles = st.number_input(
             "Confirmed Logged Mileage:",
             min_value=0.0,
@@ -687,7 +676,7 @@ if not st.session_state.mileage_data.empty:
             key=f"map_override_{last_entry_index}"
         )
         
-        # If the user adjusts the number, save it directly back to the master dataframe
+        # If the user adjusts the number, save it directly back to the main dataframe
         if adjusted_miles != float(trip_miles):
             st.session_state.mileage_data.at[last_entry_index, "Calculated Mileage"] = round(adjusted_miles, 1)
             st.rerun()
@@ -720,12 +709,11 @@ else:
 st.markdown("---")
 
 
-# --- UI: EXPORT TO EXCEL ---
+# --- UI: EXPORT TO EXCEL
 if st.session_state.uploaded_files_registry:
     st.subheader("Export Back to Excel Templates")
     st.markdown("Updates information and adds **only new manual entries** while preserving template.")
     
-    # Filter global DataFrame to pull out newly added manual rows
     new_session_rows = st.session_state.mileage_data[
         st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
     ]
@@ -781,7 +769,7 @@ if st.session_state.uploaded_files_registry:
                     today_str = datetime.date.today().strftime("%Y-%m-%d")
                     form_label = "Probation" if meta["template_type"] == "at_promise" else "GP"
 
-                    # 2. Set the simplified filename layout
+                    # Set the simplified filename layout
                     st.download_button(
                         label=f" Download Updated {filename}",
                         data=excel_stream,
