@@ -272,6 +272,7 @@ with col2:
         options=months,
         index=default_idx,
         key="cs_month_select"
+    )
 
     month_days = {
         "January": 31, "February": 28, "March": 31, "April": 30, 
