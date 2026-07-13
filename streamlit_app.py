@@ -690,7 +690,29 @@ if not st.session_state.mileage_data.empty:
             st.components.v1.iframe(map_url, width=900, height=500)
         else:
             st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
-
+            
+        # --- LIVE MAP OVERRIDE ---
+        st.markdown("### 🛠️ Verify & Adjust Route Distance")
+        st.caption("🔍 **Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
+        
+        # Get the current index of the row we are looking at
+        last_entry_index = new_app_entries.index[-1]
+        
+        # Display a number input pre-filled with the current mileage
+        adjusted_miles = st.number_input(
+            "Confirmed Logged Mileage:",
+            min_value=0.0,
+            value=float(trip_miles),
+            step=0.1,
+            format="%.1f",
+            key=f"map_override_{last_entry_index}"
+        )
+        
+        # If the user adjusts the number, save it directly back to the master dataframe
+        if adjusted_miles != float(trip_miles):
+            st.session_state.mileage_data.at[last_entry_index, "Calculated Mileage"] = round(adjusted_miles, 1)
+            st.rerun()
+        
         st.markdown("##### Actions")
         col_print, col_copy = st.columns(2)
         
