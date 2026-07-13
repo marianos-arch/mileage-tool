@@ -692,8 +692,7 @@ if not st.session_state.mileage_data.empty:
             st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
             
         # --- LIVE MAP OVERRIDE ---
-        st.markdown("### 🛠️ Verify & Adjust Route Distance")
-        st.caption("🔍 **Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
+        st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
         
         # Get the current index of the row we are looking at
         last_entry_index = new_app_entries.index[-1]
