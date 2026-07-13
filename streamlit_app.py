@@ -410,7 +410,7 @@ with col_prog_code:
     )
 
 with col_rt:
-    round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key=f"journey_round_trip_{gen}")
+    round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
 # the entire odometer block will completely vanishes for standard sheets
 if st.session_state.template_type == "at_promise":
@@ -683,7 +683,14 @@ if not st.session_state.mileage_data.empty:
         
         st.markdown("##### Actions")
         col_print, col_copy = st.columns(2)
-        
+
+
+        with col_copy:
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
+            st.code(text_to_copy, language="text")
+            st.caption("📋 Click the copy icon to save trip details")
+
+                
         with col_print:
             st.link_button(
                 "🔗 Open in Google Maps",
@@ -693,11 +700,7 @@ if not st.session_state.mileage_data.empty:
             )
             st.caption("press **Ctrl+P** to print out the Map Route")
 
-        with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
-            st.code(text_to_copy, language="text")
-            st.caption("📋 Click the copy icon to save trip details")
-            
+        
         st.markdown("---")
 
     else:
