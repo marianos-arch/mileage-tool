@@ -256,40 +256,39 @@ with col2:
         "January", "February", "March", "April", "May", "June", 
         "July", "August", "September", "October", "November", "December"
     ]
-    
-    default_idx = 0
-    if st.session_state.date_range_str:
-        try:
-            current_month_name = st.session_state.date_range_str.split(" ")[0]
-            if current_month_name in months:
-                default_idx = months.index(current_month_name)
-        except Exception:
-            default_idx = 0
-
-    selected_month = st.selectbox(
-        "Select Reporting Month (2026)",
-        options=months,
-        index=default_idx,
-        key="cs_month_select"
-    )
-
     month_days = {
         "January": 31, "February": 28, "March": 31, "April": 30, 
         "May": 31, "June": 30, "July": 31, "August": 31, 
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
-    days_in_month = month_days[selected_month]
-    computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
-    
-    st.session_state.date_range_str = computed_range
-    st.caption(f" **Formatted Range:** {computed_range}")
+    # if the uploaded file contains a complex pre-built date range string, preserve it statically
+    if st.session_state.date_range_str and "-" in st.session_state.date_range_str:
+        st.text_input("Reporting Period Range", value=st.session_state.date_range_str, disabled=True, key="static_period_display")
+    else:
+        # Fallback to manual selection if no file metadata is provided
+        try:
+            current_month_name = st.session_state.date_range_str.split(" ")[0]
+            default_idx = months.index(current_month_name) if current_month_name in months else 0
+        except (IndexError, ValueError):
+            default_idx = 0
+
+        selected_month = st.selectbox(
+            "Select Reporting Month (2026)",
+            options=months,
+            index=default_idx,
+            key="cs_month_select"
+        )
+        
+        days_in_month = month_days[selected_month]
+        st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 with col3:
     if st.session_state.template_type == "at_promise":
         rate_per_mile = st.number_input(
             "Rate per Mile ($)",
-            value=st.session_state.rate_per_mile,
+            value=float(st.session_state.rate_per_mile),
             min_value=0.0,
             step=0.01,
             format="%.3f",
