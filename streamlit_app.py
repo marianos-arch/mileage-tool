@@ -624,10 +624,10 @@ if not st.session_state.mileage_data.empty:
             timeline_steps = [f"**{origin}** (Start)->"]
             for wp in intermediate_waypoints:
                 timeline_steps.append(f"`Stop: {wp}`")
-            timeline_steps.append(f"**{final_destination}** (Destination)")
+            timeline_steps.append(f" **{final_destination}** (Destination) | ")
             
             if is_round_trip:
-                timeline_steps.append(f"**{origin}** (Return)")
+                timeline_steps.append(f" **{origin}** (RT)")
                 
             # Render the timeline with professional arrow indicators
             st.markdown(" ".join(timeline_steps))
