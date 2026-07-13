@@ -689,7 +689,7 @@ if not st.session_state.mileage_data.empty:
         else:
             st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
 
-         st.markdown("##### Actions")
+        st.markdown("##### Actions")
         col_print, col_copy = st.columns(2)
         
         with col_print:
