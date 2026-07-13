@@ -758,7 +758,7 @@ if st.session_state.uploaded_files_registry:
                     st.download_button(
                         label=f" Download Updated {filename}",
                         data=excel_stream,
-                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}_{today_str}",
+                        file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}_{today_str}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_btn_{filename}",
                         use_container_width=True
