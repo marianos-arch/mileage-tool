@@ -85,8 +85,8 @@ def detect_and_extract_workbook(file_bytes, filename):
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet1 = wb.worksheets[0]
-        
-        at_promise_check = sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value
+
+        is_probation = bool(sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value)
         standard_check = sheet1["D11"].value or sheet1["D15"].value
         
         template_type = "standard"
@@ -95,7 +95,7 @@ def detect_and_extract_workbook(file_bytes, filename):
         rate_per_mile = DEFAULT_RATE_PER_MILE
         existing_rows = []
         
-        if at_promise_check and not standard_check:
+        if is_probation:
             template_type = "at_promise"
             employee_name = str(sheet1["C3"].value or "").strip()
             date_range_str = str(sheet1["E4"].value or "").strip()
@@ -257,27 +257,31 @@ with col2:
         "January", "February", "March", "April", "May", "June", 
         "July", "August", "September", "October", "November", "December"
     ]
-    month_days = {
-        "January": 31, "February": 28, "March": 31, "April": 30, 
-        "May": 31, "June": 30, "July": 31, "August": 31, 
-        "September": 30, "October": 31, "November": 30, "December": 31
-    }
     
-    try:
-        current_month_name = st.session_state.date_range_str.split(" ")[0]
-        default_idx = months.index(current_month_name) if current_month_name in months else 0
-    except (IndexError, ValueError):
-        default_idx = 0
+    default_idx = 0
+    if st.session_state.date_range_str:
+        try:
+            current_month_name = st.session_state.date_range_str.split(" ")[0]
+            if current_month_name in months:
+                default_idx = months.index(current_month_name)
+        except Exception:
+            default_idx = 0
 
     selected_month = st.selectbox(
         "Select Reporting Month (2026)",
         options=months,
         index=default_idx,
         key="cs_month_select"
-    )
-    
+
+    month_days = {
+        "January": 31, "February": 28, "March": 31, "April": 30, 
+        "May": 31, "June": 30, "July": 31, "August": 31, 
+        "September": 30, "October": 31, "November": 30, "December": 31
+    }
+
     days_in_month = month_days[selected_month]
     computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+    
     st.session_state.date_range_str = computed_range
     st.caption(f" **Formatted Range:** {computed_range}")
 
