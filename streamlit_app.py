@@ -243,9 +243,11 @@ st.header("Mileage Cover Sheet Information")
 col1, col2, col3 = st.columns([2, 2, 1])
 
 with col1:
+    if st.session_state.employee_name and not st.session_state.get("cs_employee_name"):
+        st.session_state["cs_employee_name"] = st.session_state.employee_name
+
     employee_name = st.text_input(
         "Employee Name",
-        value=st.session_state.employee_name,
         placeholder="John Doe",
         key="cs_employee_name"
     )
