@@ -359,7 +359,7 @@ with col_dest:
         stop = st_searchbox(
             search_google_places,
             key=f"stop_search_{i}_{gen}",
-            placeholder=f"Type intermediate stop #{i+1}..."
+            placeholder=f"Type stop address #{i+1}..."
         )
         if stop:
             additional_stops.append(stop)
