@@ -666,25 +666,6 @@ if not st.session_state.mileage_data.empty:
             
         direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/"
         
-        st.markdown("##### Actions")
-        col_print, col_copy = st.columns(2)
-        
-        with col_print:
-            st.link_button(
-                "🖨️ Open in Google Maps",
-                direct_maps_url,
-                type="primary",
-                use_container_width=True
-            )
-            st.caption("💡 Click **Print** icon (top-right) or press **Ctrl+P** / **Cmd+P**")
-
-        with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles}"
-            st.code(text_to_copy, language="text")
-            st.caption("📋 Click the copy icon to save trip details")
-            
-        st.markdown("---")
-        
         if gmaps:
             embed_waypoints = list(intermediate_waypoints)
             if is_round_trip:
@@ -707,6 +688,26 @@ if not st.session_state.mileage_data.empty:
             st.components.v1.iframe(map_url, width=900, height=500)
         else:
             st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
+
+         st.markdown("##### Actions")
+        col_print, col_copy = st.columns(2)
+        
+        with col_print:
+            st.link_button(
+                "🖨️ Open in Google Maps",
+                direct_maps_url,
+                type="primary",
+                use_container_width=True
+            )
+            st.caption("💡 Click **Print** icon (top-right) or press **Ctrl+P** / **Cmd+P**")
+
+        with col_copy:
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles}"
+            st.code(text_to_copy, language="text")
+            st.caption("📋 Click the copy icon to save trip details")
+            
+        st.markdown("---")
+
     else:
         st.info("📅 Sheet template journeys are cached. Add a new manual entry above to view the map.")
 else:
