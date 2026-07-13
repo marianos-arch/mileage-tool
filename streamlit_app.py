@@ -691,6 +691,10 @@ if not st.session_state.mileage_data.empty:
 else:
     st.write("Add an entry above to generate a live map route.")
 
+
+st.markdown("---")
+
+
 # --- UI: EXPORT TO EXCEL ---
 if st.session_state.uploaded_files_registry:
     st.subheader("Export Back to Excel Templates")
