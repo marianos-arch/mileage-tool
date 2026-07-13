@@ -394,22 +394,28 @@ with col_prog_code:
 with col_rt:
     round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key=f"journey_round_trip_{gen}")
 
-st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
-col_odo_start, col_odo_end = st.columns(2)
+# Wrap the entire odometer block so it completely vanishes for standard sheets
+if st.session_state.template_type == "at_promise":
+    st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
+    col_odo_start, col_odo_end = st.columns(2)
 
-with col_odo_start:
-    odo_start_input = st.text_input(
-        "Odometer Start",
-        placeholder="e.g., 45100",
-        key=f"journey_odo_start_{gen}"
-    )
+    with col_odo_start:
+        odo_start_input = st.text_input(
+            "Odometer Start",
+            placeholder="e.g., 45100",
+            key=f"journey_odo_start_{gen}"
+        )
 
-with col_odo_end:
-    odo_end_input = st.text_input(
-        "Odometer End",
-        placeholder="e.g., 45125",
-        key=f"journey_odo_end_{gen}"
-    )
+    with col_odo_end:
+        odo_end_input = st.text_input(
+            "Odometer End",
+            placeholder="e.g., 45125",
+            key=f"journey_odo_end_{gen}"
+        )
+else:
+    # If standard, pass empty strings so your calculation logic defaults safely to Scenario D
+    odo_start_input = ""
+    odo_end_input = ""
 
 submit_button = st.button("Calculate & Add Entry", type="primary", key=f"journey_submit_btn_{gen}", use_container_width=True)
 
