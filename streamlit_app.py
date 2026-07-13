@@ -44,15 +44,32 @@ def get_gmaps_client(key):
 gmaps = get_gmaps_client(api_key)
 
 # --- GOOGLE PLACES AUTOCOMPLETE ---
-def search_google_places(search_term: str):
-    """Fetch address predictions from Google Places API."""
-    if not gmaps or not search_term:
+
+def search_google_places(query_text):
+    if not query_text or not gmaps:
         return []
     try:
-        predictions = gmaps.places_autocomplete(search_term)
+        # Bakersfield Coordinates: 35.3733° N, -119.0187° W
+        bakersfield_coords = (35.3733, -119.0187)
+        
+        # 50,000 meters = approx 31 miles around Bakersfield
+        search_radius = 100000 
+        
+        # Request predictions with local geographical bias
+        predictions = gmaps.places_autocomplete(
+            input_text=query_text,
+            location=bakersfield_coords,
+            radius=search_radius,
+            components={"country": "us"} # Limits results strictly to the USA
+        )
+        
+        # Format the predictions for your st_searchbox to display
         return [p['description'] for p in predictions]
-    except Exception:
+        
+    except Exception as e:
+        print(f"Error fetching local places: {e}")
         return []
+
 
 # --- GOOGLE DISTANCE MATRIX API ---
 def get_google_distance_miles(origin, destination):
