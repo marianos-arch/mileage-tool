@@ -612,19 +612,48 @@ if not st.session_state.mileage_data.empty:
         is_round_trip = last_entry["Round Trip"] == "Yes"
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
+
+        # --- REVAMPED STEP 3: VISUAL ROUTE TIMELINE & KEY METRICS ---
+        st.subheader("📍 Current Route Detail")
         
-        visual_chain = " ➡️ ".join(all_dest_legs)
-        if is_round_trip:
-            route_label = f"{origin} ➡️ {visual_chain} 🔄 {origin}"
-            mileage_label = f"{trip_miles} miles (Round Trip)"
-        else:
-            route_label = f"{origin} ➡️ {visual_chain}"
-            mileage_label = f"{trip_miles} miles (One Way)"
+        # 1. Create a beautiful, card-like container for the journey timeline
+        with st.container(border=True):
+            st.markdown(f"**📅 Date of Travel:** `{entry_date}` | **🎯 Purpose:** {entry_purpose}")
+            
+            # Construct a clean, modern visual timeline breadcrumb
+            timeline_steps = [f"**{origin}** (Start)"]
+            for wp in intermediate_waypoints:
+                timeline_steps.append(f"`🏃 Stop: {wp}`")
+            timeline_steps.append(f"**{final_destination}** (Destination)")
+            
+            if is_round_trip:
+                timeline_steps.append(f"**{origin}** (Return)")
+                
+            # Render the timeline with professional arrow indicators
+            st.markdown(" 👉 ".join(timeline_steps))
+
+        # 2. Display key trip metadata metrics side-by-side below the timeline card
+        col_metric_dist, col_metric_type, col_metric_status = st.columns(3)
         
-        st.subheader("Current Route Detail")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("Route", route_label)
-        col_m2.metric("Distance", mileage_label)
+        with col_metric_dist:
+            st.metric(
+                label="🛣️ Total Distance", 
+                value=f"{trip_miles} mi"
+            )
+            
+        with col_metric_type:
+            st.metric(
+                label="🔄 Trip Type", 
+                value="Round Trip" if is_round_trip else "One Way"
+            )
+            
+        with col_metric_status:
+            # Displays the active destination endpoint cleanly
+            st.metric(
+                label="🏁 Final Stop", 
+                value=final_destination if not is_round_trip else "Returned Home",
+                help="The primary destination point of this recorded log."
+            )
 
         encoded_origin = urllib.parse.quote_plus(origin)
         encoded_final_destination = urllib.parse.quote_plus(final_destination)
