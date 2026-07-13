@@ -288,15 +288,20 @@ with col2:
     st.caption(f" **Formatted Range:** {computed_range}")
 
 with col3:
-    rate_per_mile = st.number_input(
-        "Rate per Mile ($)",
-        value=st.session_state.rate_per_mile,
-        min_value=0.0,
-        step=0.01,
-        format="%.3f",
-        key="cs_rate_per_mile"
-    )
-    st.session_state.rate_per_mile = rate_per_mile
+    # Check if the uploaded sheet is AT-PROMISE
+    if st.session_state.template_type == "at_promise":
+        rate_per_mile = st.number_input(
+            "Rate per Mile ($)",
+            value=st.session_state.rate_per_mile,
+            min_value=0.0,
+            step=0.01,
+            format="%.3f",
+            key="cs_rate_per_mile"
+        )
+        st.session_state.rate_per_mile = rate_per_mile
+    else:
+        # If standard sheet, quietly keep the default rate without showing the box
+        st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
 
 st.markdown("---")
 
