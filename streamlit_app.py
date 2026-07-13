@@ -724,7 +724,7 @@ if not st.session_state.mileage_data.empty:
             st.caption("press **Ctrl+P** to print out the Map Route")
 
         with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles}"
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
             
