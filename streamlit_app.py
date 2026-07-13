@@ -642,14 +642,22 @@ if st.session_state.uploaded_files_registry:
     st.subheader("Export Back to Excel Templates")
     st.markdown("Updates information and adds **only new manual entries** while preserving template formatting.")
     
-    # Isolate newly recorded rows from this session
-    new_session_rows = st.session_state.mileage_data[
-        st.session_state.mileage_data["_source_file"] == "manual_entry"
-    ]
+    # Isolate newly recorded rows safely (handles old cached DataFrames without crashing)
+    if "_source_file" in st.session_state.mileage_data.columns:
+        new_session_rows = st.session_state.mileage_data[
+            st.session_state.mileage_data["_source_file"] == "manual_entry"
+        ]
+    else:
+        new_session_rows = st.session_state.mileage_data[
+            ~st.session_state.mileage_data["Starting Location"].str.contains(IMPORT_MARKER, na=False)
+        ]
     
-    # Dynamic loop through all active sheet registries (handles unique versions instantly)
+    # Dynamic loop through all active sheet registries
     for filename, meta in st.session_state.uploaded_files_registry.items():
-        template_display = "AT-PROMISE (Probation)" if meta["template_type"] == "at_promise" else "Standard (GP)"
+        # Read directly from the file's own meta dictionary, NOT the global st.session_state
+        is_probation = (meta["template_type"] == "at_promise")
+        template_display = "AT-PROMISE (Probation)" if is_probation else "Standard (GP)"
+        form_label = "Probation" if is_probation else "GP"
         
         with st.expander(f"Export Workbook: {filename} ({template_display})", expanded=True):
             if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
@@ -657,7 +665,8 @@ if st.session_state.uploaded_files_registry:
                     output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
                     s1 = output_wb.worksheets[0]
                     
-                    if meta["template_type"] == "at_promise":
+                    # Route formatting exclusively based on this specific file's internal type
+                    if is_probation:
                         s1["C3"] = st.session_state.employee_name
                         s1["E4"] = st.session_state.date_range_str
                         s1["E3"] = st.session_state.rate_per_mile
@@ -694,7 +703,6 @@ if st.session_state.uploaded_files_registry:
                     excel_stream.seek(0)
                     
                     today_str = datetime.date.today().strftime("%Y-%m-%d")
-                    form_label = "Probation" if meta["template_type"] == "at_promise" else "GP"
 
                     st.download_button(
                         label=f"📥 Download Updated {filename}",
@@ -708,10 +716,6 @@ if st.session_state.uploaded_files_registry:
                     st.error(f"Failed to append records to target workbook {filename}: {e}")
 else:
     st.info("Upload excel sheets above to enable spreadsheet exports.")
-
-st.markdown("---")
-
-
 
 
 
