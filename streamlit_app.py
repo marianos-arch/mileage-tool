@@ -666,6 +666,8 @@ if not st.session_state.mileage_data.empty:
             
         direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/"
         
+        st.markdown("---")
+
         if gmaps:
             embed_waypoints = list(intermediate_waypoints)
             if is_round_trip:
