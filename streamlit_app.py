@@ -682,8 +682,7 @@ if not st.session_state.mileage_data.empty:
             st.rerun()
         
         st.markdown("##### Actions")
-        col_print, col_copy = st.columns(2)
-
+        col_copy, col_print = st.columns(2)
 
         with col_copy:
             text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
@@ -700,7 +699,6 @@ if not st.session_state.mileage_data.empty:
             )
             st.caption("press **Ctrl+P** to print out the Map Route")
 
-        
         st.markdown("---")
 
     else:
