@@ -16,7 +16,7 @@ MILEAGE_COLUMNS = [
     "Purpose of Travel", "Odometer Start", "Odometer End", "Calculated Mileage", "Program Code"
 ]
 
-IMPORT_MARKER = "Imported from template (No Starting Location)"
+IMPORT_MARKER = "Imported from template"
 METERS_TO_MILES = 0.000621371
 DEFAULT_RATE_PER_MILE = 0.725
 
@@ -27,7 +27,6 @@ COMMON_LOCATIONS = {
     "DEC": "1130 17th St, Bakersfield, CA 93301",
     "Delano": "1109 High St., Delano, CA 93215"
 }
-# Common Locations can be added
 
 # --- API KEY & CLIENT INITIALIZATION
 api_key = st.secrets.get("GOOGLE_MAPS_API_KEY", "")
@@ -45,31 +44,22 @@ def get_gmaps_client(key):
 gmaps = get_gmaps_client(api_key)
 
 # --- GOOGLE PLACES AUTOCOMPLETE
-
 def search_google_places(query_text):
     if not query_text or not gmaps:
         return []
     try:
-        # Bakersfield Coordinates
         bakersfield_coords = (35.3733, -119.0187)
-        
-        # approx 31 miles around Bakersfield
         search_radius = 50000 
-        
-        # predictions with local geographical bias
         predictions = gmaps.places_autocomplete(
             input_text=query_text,
             location=bakersfield_coords,
             radius=search_radius,
-            components={"country": "us"} # Limits USA
+            components={"country": "us"}
         )
-        
         return [p['description'] for p in predictions]
-        
     except Exception as e:
         print(f"Error fetching local places: {e}")
         return []
-
 
 # --- GOOGLE DISTANCE MATRIX API 
 def get_google_distance_miles(origin, destination):
@@ -79,7 +69,6 @@ def get_google_distance_miles(origin, destination):
     try:
         result = gmaps.distance_matrix(origin, destination, mode="driving")
         element = result['rows'][0]['elements'][0]
-        
         if element['status'] == 'OK':
             meters = element['distance']['value']
             return round(meters * METERS_TO_MILES, 1)
@@ -97,7 +86,6 @@ def detect_and_extract_workbook(file_bytes, filename):
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet1 = wb.worksheets[0]
         
-        # this will detect template type
         at_promise_check = sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value
         standard_check = sheet1["D11"].value or sheet1["D15"].value
         
@@ -116,15 +104,13 @@ def detect_and_extract_workbook(file_bytes, filename):
             except (ValueError, TypeError):
                 rate_per_mile = DEFAULT_RATE_PER_MILE
                 
-            # This will extract AT-PROMISE journeys (row 9+)
+            # Extract AT-PROMISE journeys (row 9+)
             row_idx = 9
             while sheet1[f"B{row_idx}"].value:
                 raw_date = sheet1[f"B{row_idx}"].value
                 try:
-                    # Safetly converts strings like "1/15/26" or datetime objects into a clean YYYY-MM-DD string
                     formatted_date = pd.to_datetime(raw_date).strftime("%Y-%m-%d")
                 except Exception:
-                    # fallback if the cell is corrupted or unparseable text
                     formatted_date = str(raw_date)[:10] if raw_date else ""
                 
                 try:
@@ -133,13 +119,14 @@ def detect_and_extract_workbook(file_bytes, filename):
                     calc_mileage = abs(odo_end - odo_start) if (odo_start and odo_end) else 0.0
                 except (ValueError, TypeError):
                     odo_start, odo_end, calc_mileage = 0.0, 0.0, 0.0
-
+                    
+                # FIX: Read the explicit starting location value directly from Column C instead of a generic string
                 excel_start_loc = sheet1[f"C{row_idx}"].value
                 start_location_val = str(excel_start_loc).strip() if excel_start_loc else f"{IMPORT_MARKER} (Probation)"
-    
+                    
                 existing_rows.append({
                     "Date": formatted_date,
-                    "Starting Location": start_location_val, #  Preserves your Excel data!
+                    "Starting Location": start_location_val,
                     "Destination": str(sheet1[f"D{row_idx}"].value or ""),
                     "Round Trip": "Yes",
                     "Purpose of Travel": str(sheet1[f"E{row_idx}"].value or ""),
@@ -147,7 +134,7 @@ def detect_and_extract_workbook(file_bytes, filename):
                     "Odometer End": odo_end,
                     "Calculated Mileage": round(calc_mileage, 1),
                     "Program Code": "",
-                    "_source_file": filename  # Attached for workspace tracking
+                    "_source_file": filename  # Traceability link for handling multi-sheet sorting
                 })
                 row_idx += 1
         else:
@@ -174,7 +161,8 @@ def detect_and_extract_workbook(file_bytes, filename):
                         "Odometer Start": 0,
                         "Odometer End": 0,
                         "Calculated Mileage": float(sheet3[f"F{row_idx}"].value or 0.0),
-                        "Program Code": str(sheet3[f"D{row_idx}"].value or "")
+                        "Program Code": str(sheet3[f"D{row_idx}"].value or ""),
+                        "_source_file": filename
                     })
                     row_idx += 1
                     
@@ -194,14 +182,13 @@ def detect_and_extract_workbook(file_bytes, filename):
 
 # --- SESSION STATE INITIALIZATION
 def init_session_state():
-    """Initialize all required session state variables."""
     defaults = {
-        "mileage_data": pd.DataFrame(columns=MILEAGE_COLUMNS),
+        "mileage_data": pd.DataFrame(columns=MILEAGE_COLUMNS + ["_source_file"]),
         "employee_name": "",
         "date_range_str": "",
         "rate_per_mile": DEFAULT_RATE_PER_MILE,
-        "template_type": "standard",  # This creates a backwards compatibility field
-        "uploaded_files_registry": {},  # Map filename -> parsed document dict
+        "template_type": "standard",  
+        "uploaded_files_registry": {},  
         "processed_file_hashes": set() 
     }
     for key, value in defaults.items():
@@ -233,13 +220,11 @@ if uploaded_templates:
                 st.session_state.uploaded_files_registry[uploaded_file.name] = parsed_result
                 st.session_state.processed_file_hashes.add(uploaded_file.name)
                 
-                # singular fields for backward compatibility using the last active file
                 st.session_state.template_type = parsed_result["template_type"]
                 st.session_state.employee_name = parsed_result["employee_name"]
                 st.session_state.date_range_str = parsed_result["date_range_str"]
                 st.session_state.rate_per_mile = parsed_result["rate_per_mile"]
                 
-                # Adds in rows safely without deleting past histories
                 if parsed_result["rows"]:
                     new_df = pd.DataFrame(parsed_result["rows"])
                     st.session_state.mileage_data = pd.concat(
@@ -272,7 +257,6 @@ with col2:
         "January", "February", "March", "April", "May", "June", 
         "July", "August", "September", "October", "November", "December"
     ]
-    
     month_days = {
         "January": 31, "February": 28, "March": 31, "April": 30, 
         "May": 31, "June": 30, "July": 31, "August": 31, 
@@ -294,12 +278,10 @@ with col2:
     
     days_in_month = month_days[selected_month]
     computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
-    
     st.session_state.date_range_str = computed_range
     st.caption(f" **Formatted Range:** {computed_range}")
 
 with col3:
-    # Check if the uploaded sheet is AT-PROMISE Probation Form
     if st.session_state.template_type == "at_promise":
         rate_per_mile = st.number_input(
             "Rate per Mile ($)",
@@ -311,7 +293,6 @@ with col3:
         )
         st.session_state.rate_per_mile = rate_per_mile
     else:
-        # If its a GP standard sheet, quietly keep the default rate without showing the box
         st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
 
 st.markdown("---")
@@ -319,13 +300,10 @@ st.markdown("---")
 # --- UI: ADD NEW JOURNEY FORM 
 st.header(" Add New Mileage Entry")
 
-# We introduce a generation counter key
-# to reset all child widgets cleanly without throwing state modification errors.
 if "form_generation" not in st.session_state:
     st.session_state.form_generation = 0
 
 gen = st.session_state.form_generation
-
 today = datetime.date.today()
 col_date, col_start, col_dest = st.columns(3)
 
@@ -334,8 +312,6 @@ with col_date:
 
 with col_start:
     st.write("**Starting Location**")
-    
-    # quick Select Dropdown Menu
     selected_shortcut = st.selectbox(
         "Quick Select Location",
         options=list(COMMON_LOCATIONS.keys()),
@@ -343,18 +319,14 @@ with col_start:
         label_visibility="collapsed"
     )
     
-    # Chheck the user's choice
     if selected_shortcut == "Custom / Type Address...":
-        # Show the interactive search box if they want a custom route (Simple to hide it)
         start_loc = st_searchbox(
             search_google_places,
             key=f"start_location_search_{gen}",
             placeholder="Type custom starting address..."
         )
     else:
-        # Hide the search box
         start_loc = COMMON_LOCATIONS[selected_shortcut]
-        
         st.info(f"**Using:** {start_loc}")
 
 if "num_stops" not in st.session_state:
@@ -362,7 +334,6 @@ if "num_stops" not in st.session_state:
 
 with col_dest:
     st.write("**Final Destination**")
-    
     selected_dest_shortcut = st.selectbox(
         "Quick Select Destination",
         options=list(COMMON_LOCATIONS.keys()),
@@ -378,7 +349,6 @@ with col_dest:
         )
     else:
         dest_loc = COMMON_LOCATIONS[selected_dest_shortcut]
-        
         st.info(f"**Using:** {dest_loc}")
         
     additional_stops = []
@@ -416,7 +386,6 @@ with col_prog_code:
 with col_rt:
     round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
-# the entire odometer block will completely vanishes for standard sheets
 if st.session_state.template_type == "at_promise":
     st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
     col_odo_start, col_odo_end = st.columns(2)
@@ -435,7 +404,6 @@ if st.session_state.template_type == "at_promise":
             key=f"journey_odo_end_{gen}"
         )
 else:
-    # If standard, pass empty strings
     odo_start_input = ""
     odo_end_input = ""
 
@@ -453,7 +421,6 @@ if submit_button:
             current_origin = stop
             
         google_miles += get_google_distance_miles(current_origin, dest_loc)
-        
         calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles
         calculated_miles = round(calculated_miles, 1)
 
@@ -493,17 +460,16 @@ if submit_button:
             "Odometer Start": o_start,
             "Odometer End": o_end,
             "Calculated Mileage": calculated_miles,
-            "Program Code": program_code
+            "Program Code": program_code,
+            "_source_file": "manual_entry"
         }
         st.session_state.mileage_data = pd.concat(
             [st.session_state.mileage_data, pd.DataFrame([new_entry])],
             ignore_index=True
         )
         
-        # and reset dynamic stop counter back to 0.
         st.session_state.form_generation += 1
         st.session_state.num_stops = 0
-        
         st.success(f"✅ Added! Distance: {google_miles} miles")
         st.rerun()
         
@@ -514,60 +480,39 @@ st.header("Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
     new_app_entries = st.session_state.mileage_data[
-        st.session_state.mileage_data["Starting Location"] != IMPORT_MARKER
+        ~st.session_state.mileage_data["Starting Location"].str.contains(IMPORT_MARKER, na=False)
     ]
 
     if not new_app_entries.empty:
         last_entry = new_app_entries.iloc[-1]
-
         origin = last_entry["Starting Location"]
         raw_destination = str(last_entry["Destination"])
-        
         clean_destination_chain = raw_destination.replace(" (RT)", "")
-        
         all_dest_legs = [leg.strip() for leg in clean_destination_chain.split(" -> ")]
         final_destination = all_dest_legs[-1]
         intermediate_waypoints = all_dest_legs[:-1] if len(all_dest_legs) > 1 else []
-        
         trip_miles = last_entry["Calculated Mileage"]
         is_round_trip = last_entry["Round Trip"] == "Yes"
         entry_date = last_entry["Date"]
         entry_purpose = last_entry["Purpose of Travel"]
 
-        #  VISUAL ROUTE TIMELINE & KEY METRICS 
         st.subheader("Current Route Detail")
-        
         with st.container(border=True):
             st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}")
-            
-            #  a clean modern visual timeline 
             timeline_steps = [f"**{origin}** (Start)->"]
             for wp in intermediate_waypoints:
                 timeline_steps.append(f"`Stop: {wp}`")
             timeline_steps.append(f" **{final_destination}** (Destination) | ")
-            
             if is_round_trip:
                 timeline_steps.append(f" **{origin}** (RT)")
-                
-            # the timeline with arrow indicators
             st.markdown(" ".join(timeline_steps))
 
         col_metric_dist, col_metric_type, col_metric_status = st.columns(3)
-        
         with col_metric_dist:
-            st.metric(
-                label="Total Distance", 
-                value=f"{trip_miles} mi"
-            )
-            
+            st.metric(label="Total Distance", value=f"{trip_miles} mi")
         with col_metric_type:
-            st.metric(
-                label="Trip Type", 
-                value="Round Trip" if is_round_trip else "One Way"
-            )
-            
+            st.metric(label="Trip Type", value="Round Trip" if is_round_trip else "One Way")
         with col_metric_status:
-            # display the active destination endpoint cleanly
             st.metric(
                 label="Final Stop", 
                 value=final_destination if not is_round_trip else "Returned Back",
@@ -576,15 +521,11 @@ if not st.session_state.mileage_data.empty:
 
         encoded_origin = urllib.parse.quote_plus(origin)
         encoded_final_destination = urllib.parse.quote_plus(final_destination)
-        
-        waypoints_joined = "|".join([urllib.parse.quote_plus(wp) for wp in intermediate_waypoints])
-        
         maps_url_legs = [encoded_origin] + [urllib.parse.quote_plus(wp) for wp in intermediate_waypoints] + [encoded_final_destination]
         if is_round_trip:
             maps_url_legs.append(encoded_origin)
             
         direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/"
-        
         st.markdown("---")
 
         if gmaps:
@@ -596,7 +537,6 @@ if not st.session_state.mileage_data.empty:
                 embed_destination_target = final_destination
                 
             encoded_embed_waypoints = "|".join([urllib.parse.quote_plus(wp) for wp in embed_waypoints])
-            
             map_url = (
                 f"https://www.google.com/maps/embed/v1/directions"
                 f"?key={api_key}"
@@ -605,18 +545,13 @@ if not st.session_state.mileage_data.empty:
             )
             if encoded_embed_waypoints:
                 map_url += f"&waypoints={encoded_embed_waypoints}"
-                
             st.components.v1.iframe(map_url, width=900, height=500)
         else:
             st.warning("Please add a valid Google Maps API Key.")
             
- # --- LIVE MAP OVERRIDE
         st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
-        
-        # This will get the current index of the row we are looking at
         last_entry_index = new_app_entries.index[-1]
         
-        # This will display a number input pre-filled with the current mileage
         adjusted_miles = st.number_input(
             "Confirmed Logged Mileage:",
             min_value=0.0,
@@ -626,19 +561,16 @@ if not st.session_state.mileage_data.empty:
             key=f"map_override_{last_entry_index}"
         )
         
-        # If the user adjusts the number, save it directly back to the main dataframe
         if adjusted_miles != float(trip_miles):
             st.session_state.mileage_data.at[last_entry_index, "Calculated Mileage"] = round(adjusted_miles, 1)
             st.rerun()
         
         st.markdown("##### Actions")
         col_copy, col_print = st.columns(2)
-
         with col_copy:
             text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
-
                 
         with col_print:
             st.link_button(
@@ -648,33 +580,26 @@ if not st.session_state.mileage_data.empty:
                 use_container_width=True
             )
             st.caption("press **Ctrl+P** to print out the Map Route")
-
         st.markdown("---")
-
     else:
         st.info("Sheet template journeys are uploaded. Add a new manual entry above to view the map.")
 else:
     st.write("Add an entry above to generate a live map route.")
 
-
 st.markdown("---")
-
 
 # --- UI: MILEAGE LOG TABLE
 st.header("Mileage Log Table")
 
 if not st.session_state.mileage_data.empty:
     total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
-    
     col_metric1, col_metric2, col_spacer = st.columns([1, 1, 2])
     with col_metric1:
         st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
     
     st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
 
-# DYNAMIC COLUMNS: Determine which columns to display or hide
     if st.session_state.template_type == "at_promise":
-        # Show everything including Odometer tracking fields
         display_columns = MILEAGE_COLUMNS
         column_configuration = {
             "Calculated Mileage": st.column_config.NumberColumn(
@@ -686,7 +611,6 @@ if not st.session_state.mileage_data.empty:
             )
         }
     else:
-        # Standard sheet layout: Filter out Odometer fields entirely from view
         display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
         column_configuration = {
             "Calculated Mileage": st.column_config.NumberColumn(
@@ -698,9 +622,10 @@ if not st.session_state.mileage_data.empty:
             )
         }
     
+    # Hide the hidden internal trace column from being modified
     edited_df = st.data_editor(
         st.session_state.mileage_data,
-        column_order=display_columns, # This controls visible columns and ordering dynamically!
+        column_order=display_columns, 
         num_rows="dynamic",
         use_container_width=True,
         key="mileage_editor",
@@ -709,7 +634,6 @@ if not st.session_state.mileage_data.empty:
     st.session_state.mileage_data = edited_df
 else:
     st.info(" No mileage entries added yet. Use the form above to get started.")
-
 
 st.markdown("---")
 
@@ -786,7 +710,6 @@ else:
     st.info("Upload excel sheets above to enable spreadsheet exports.")
 
 st.markdown("---")
-
 
 
 
