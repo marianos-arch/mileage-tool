@@ -23,7 +23,7 @@ DEFAULT_RATE_PER_MILE = 0.725
 COMMON_LOCATIONS = {
     "Custom / Type Address...": "",
     "Main Office": "1616 29th St, Bakersfield, CA 93301",
-    "D.E.C": "1130 17th St, Bakersfield, CA 93301",
+    "DEC": "1130 17th St, Bakersfield, CA 93301",
     "Delano": "1109 High St., Delano, CA 93215"
 }
 
