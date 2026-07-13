@@ -361,12 +361,29 @@ if "num_stops" not in st.session_state:
 with col_dest:
     st.write("**Final Destination**")
     
-    dest_loc = st_searchbox(
-        search_google_places,
-        key=f"destination_search_{gen}",
-        placeholder="Type final destination address..."
+    # 1. Quick Select Dropdown Menu for Destination
+    selected_dest_shortcut = st.selectbox(
+        "Quick Select Destination",
+        options=list(COMMON_LOCATIONS.keys()),
+        key=f"dest_shortcut_{gen}",
+        label_visibility="collapsed"
     )
     
+    # 2. Check the user's choice and conditionally toggle visibility
+    if selected_dest_shortcut == "Custom / Type Address...":
+        # Show interactive search box if they want a custom destination
+        dest_loc = st_searchbox(
+            search_google_places,
+            key=f"destination_search_{gen}",
+            placeholder="Type final destination address..."
+        )
+    else:
+        # Hide the search box and automatically set dest_loc to the preset address
+        dest_loc = COMMON_LOCATIONS[selected_dest_shortcut]
+        
+        # Display a clean informational badge
+        st.info(f"**Using:** {dest_loc}")
+        
     additional_stops = []
     for i in range(st.session_state.num_stops):
         stop = st_searchbox(
