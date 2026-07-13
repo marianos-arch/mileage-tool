@@ -8,7 +8,7 @@ import openpyxl
 from io import BytesIO
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Mileage Tracker Tool", layout="wide")
+st.set_page_config(page_title="GP Mileage Tool", layout="wide")
 
 # --- CONSTANTS ---
 MILEAGE_COLUMNS = [
@@ -199,13 +199,13 @@ def init_session_state():
 init_session_state()
 
 # --- UI: HEADER ---
-st.title("🚗 Company Mileage Tracker")
+st.title("GP Mileage Tracker")
 st.markdown("---")
 
 # --- UI: FILE UPLOAD & INGESTION ---
-st.header("📂 Excel Template Upload")
+st.header("Mileage Excel Template Upload")
 uploaded_templates = st.file_uploader(
-    "Upload your mileage workbooks (.xlsx)", 
+    "Upload your mileage excel sheet (.xlsx)", 
     type=["xlsx"], 
     accept_multiple_files=True
 )
@@ -235,7 +235,7 @@ if uploaded_templates:
                         [st.session_state.mileage_data, new_df], 
                         ignore_index=True
                     )
-                st.toast(f"📥 Imported {parsed_result['imported_count']} records from {uploaded_file.name} ({parsed_result['template_type'].upper()})")
+                st.toast(f" Imported {parsed_result['imported_count']} records from {uploaded_file.name} ({parsed_result['template_type'].upper()})")
                 state_updated = True
                 
     if state_updated:
@@ -244,7 +244,7 @@ if uploaded_templates:
 st.markdown("---")
 
 # --- UI: COVER SHEET INFO ---
-st.header("📋 Cover Sheet Information")
+st.header("Mileage Cover Sheet Information")
 col1, col2, col3 = st.columns([2, 2, 1])
 
 with col1:
@@ -285,7 +285,7 @@ with col2:
     computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
     
     st.session_state.date_range_str = computed_range
-    st.caption(f"📅 **Formatted Range:** {computed_range}")
+    st.caption(f" **Formatted Range:** {computed_range}")
 
 with col3:
     rate_per_mile = st.number_input(
@@ -301,10 +301,9 @@ with col3:
 st.markdown("---")
 
 # --- UI: ADD NEW JOURNEY FORM ---
-# --- UI: ADD NEW JOURNEY FORM ---
-st.header("📍 Add New Journey")
+st.header(" Add New Mileage Entry")
 
-# We introduce a generation counter key. Changing this key forces Streamlit 
+# We introduce a generation counter key
 # to reset all child widgets cleanly without throwing state modification errors.
 if "form_generation" not in st.session_state:
     st.session_state.form_generation = 0
@@ -322,7 +321,7 @@ with col_start:
     
     # 1. Quick Select Dropdown Menu
     selected_shortcut = st.selectbox(
-        "📍 Quick Select Location",
+        "Quick Select Location",
         options=list(COMMON_LOCATIONS.keys()),
         key=f"start_shortcut_{gen}",
         label_visibility="collapsed"
@@ -341,7 +340,7 @@ with col_start:
         start_loc = COMMON_LOCATIONS[selected_shortcut]
         
         # Display a clean informational badge so they know what address is active
-        st.info(f"🏢 **Using:** {start_loc}")
+        st.info(f"**Using:** {start_loc}")
 
 if "num_stops" not in st.session_state:
     st.session_state.num_stops = 0
@@ -367,11 +366,11 @@ with col_dest:
             
     c_add, c_rem = st.columns(2)
     with c_add:
-        if st.button("➕ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True):
+        if st.button("✚ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True):
             st.session_state.num_stops += 1
             st.rerun()
     with c_rem:
-        if st.button("➖ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0:
+        if st.button("▬ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0:
             st.session_state.num_stops -= 1
             st.rerun()
 
@@ -383,14 +382,14 @@ with col_purpose:
 with col_prog_code:
     program_code = st.text_input(
         "Program Code",
-        placeholder="e.g., PROG-101",
+        placeholder="e.g., 101",
         key=f"journey_prog_code_{gen}"
     )
 
 with col_rt:
     round_trip = st.selectbox("Round Trip?", ["No", "Yes"], key=f"journey_round_trip_{gen}")
 
-st.markdown("##### 🚗 Odometer Sync Settings")
+st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
 col_odo_start, col_odo_end = st.columns(2)
 
 with col_odo_start:
@@ -479,7 +478,7 @@ if submit_button:
 st.markdown("---")
 
 # --- UI: MILEAGE LOG TABLE ---
-st.header("📊 Mileage Log")
+st.header("Mileage Log Table")
 
 if not st.session_state.mileage_data.empty:
     total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
@@ -488,8 +487,7 @@ if not st.session_state.mileage_data.empty:
     with col_metric1:
         st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
     
-    # Simple explicit instruction for the team
-    st.caption("💡 **Tip:** The table below is interactive. If the API estimate differs from your odometer or dashboard, double-click the **Calculated Mileage** cell to type the exact number.")
+    st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
     
     # Configuring the column to show it's an editable number
     edited_df = st.data_editor(
@@ -509,15 +507,15 @@ if not st.session_state.mileage_data.empty:
     )
     st.session_state.mileage_data = edited_df
 else:
-    st.info("📝 No mileage entries added yet. Use the form above to get started.")
+    st.info(" No mileage entries added yet. Use the form above to get started.")
 
 
 st.markdown("---")
 
 # --- UI: EXPORT TO EXCEL ---
 if st.session_state.uploaded_files_registry:
-    st.subheader("💾 Export Back to Excel Templates")
-    st.markdown("Updates cover meta info and appends **only new user manual entries** while preserving template styles.")
+    st.subheader("Export Back to Excel Templates")
+    st.markdown("Updates information and adds **only new manual entries** while preserving template.")
     
     # Filter global DataFrame to pull out newly added manual rows
     new_session_rows = st.session_state.mileage_data[
@@ -527,7 +525,7 @@ if st.session_state.uploaded_files_registry:
     for filename, meta in st.session_state.uploaded_files_registry.items():
         template_display = "AT-PROMISE" if meta["template_type"] == "at_promise" else "Standard"
         
-        with st.expander(f"📦 Export Workbook: {filename} ({template_display})", expanded=True):
+        with st.expander(f"Export Workbook: {filename} ({template_display})", expanded=True):
             if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
                 try:
                     output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
@@ -574,7 +572,7 @@ if st.session_state.uploaded_files_registry:
                     excel_stream.seek(0)
                     
                     st.download_button(
-                        label=f"📥 Download Updated {filename}",
+                        label=f" Download Updated {filename}",
                         data=excel_stream,
                         file_name=f"Updated_{st.session_state.employee_name.replace(' ', '_')}_{filename}",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -584,12 +582,12 @@ if st.session_state.uploaded_files_registry:
                 except Exception as e:
                     st.error(f"Failed to append records to target workbook {filename}: {e}")
 else:
-    st.info("💡 Upload workbook sheets above to enable matching multi-destination spreadsheet formatting exports.")
+    st.info(" Upload excel sheets above to enable spreadsheet exports.")
 
 st.markdown("---")
 
 # --- UI: ROUTE MAP & PRINT VIEW ---
-st.header("🗺️ Route Map & Print View")
+st.header("Route Map & Print View")
 
 if not st.session_state.mileage_data.empty:
     new_app_entries = st.session_state.mileage_data[
@@ -614,7 +612,7 @@ if not st.session_state.mileage_data.empty:
         entry_purpose = last_entry["Purpose of Travel"]
 
         # --- REVAMPED STEP 3: VISUAL ROUTE TIMELINE & KEY METRICS ---
-        st.subheader("📍 Current Route Detail")
+        st.subheader("Current Route Detail")
         
         # 1. Create a beautiful, card-like container for the journey timeline
         with st.container(border=True):
@@ -689,7 +687,7 @@ if not st.session_state.mileage_data.empty:
                 
             st.components.v1.iframe(map_url, width=900, height=500)
         else:
-            st.warning("🔑 Map preview unavailable. Please add a valid Google Maps API Key.")
+            st.warning("Please add a valid Google Maps API Key.")
             
         # --- LIVE MAP OVERRIDE ---
         st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
@@ -717,12 +715,12 @@ if not st.session_state.mileage_data.empty:
         
         with col_print:
             st.link_button(
-                "🖨️ Open in Google Maps",
+                "🔗 Open in Google Maps",
                 direct_maps_url,
                 type="primary",
                 use_container_width=True
             )
-            st.caption("💡 Click **Print** icon (top-right) or press **Ctrl+P** / **Cmd+P**")
+            st.caption("press **Ctrl+P** to print out the Map Route")
 
         with col_copy:
             text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {trip_miles}"
@@ -732,6 +730,6 @@ if not st.session_state.mileage_data.empty:
         st.markdown("---")
 
     else:
-        st.info("📅 Sheet template journeys are cached. Add a new manual entry above to view the map.")
+        st.info("Sheet template journeys are uploaded. Add a new manual entry above to view the map.")
 else:
     st.write("Add an entry above to generate a live map route.")
