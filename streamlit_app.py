@@ -621,7 +621,7 @@ if not st.session_state.mileage_data.empty:
             st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}")
             
             # Construct a clean, modern visual timeline breadcrumb
-            timeline_steps = [f"**{origin}** (Start)"]
+            timeline_steps = [f"**{origin}** (Start)->"]
             for wp in intermediate_waypoints:
                 timeline_steps.append(f"`Stop: {wp}`")
             timeline_steps.append(f"**{final_destination}** (Destination)")
@@ -637,21 +637,21 @@ if not st.session_state.mileage_data.empty:
         
         with col_metric_dist:
             st.metric(
-                label="🛣️ Total Distance", 
+                label="Total Distance", 
                 value=f"{trip_miles} mi"
             )
             
         with col_metric_type:
             st.metric(
-                label="🔄 Trip Type", 
+                label="Trip Type", 
                 value="Round Trip" if is_round_trip else "One Way"
             )
             
         with col_metric_status:
             # Displays the active destination endpoint cleanly
             st.metric(
-                label="🏁 Final Stop", 
-                value=final_destination if not is_round_trip else "Returned Home",
+                label="Final Stop", 
+                value=final_destination if not is_round_trip else "Returned Back",
                 help="The primary destination point of this recorded log."
             )
 
