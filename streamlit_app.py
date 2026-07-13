@@ -81,13 +81,12 @@ def get_google_distance_miles(origin, destination):
 
 # --- HELPERS: TEMPLATE PROCESSING
 def detect_and_extract_workbook(file_bytes, filename):
-    """Detect template type and extract existing journey rows."""
+    """Detect template type and extract existing journey rows with header metadata."""
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
         sheet1 = wb.worksheets[0]
-
+        # Identify template explicitly by cell landmarks
         is_probation = bool(sheet1["C3"].value or sheet1["E3"].value or sheet1["E4"].value)
-        standard_check = sheet1["D11"].value or sheet1["D15"].value
         
         template_type = "standard"
         employee_name = ""
@@ -104,7 +103,7 @@ def detect_and_extract_workbook(file_bytes, filename):
             except (ValueError, TypeError):
                 rate_per_mile = DEFAULT_RATE_PER_MILE
                 
-            # Extract AT-PROMISE journeys (row 9+)
+            # Extract Probation journeys (row 9+)
             row_idx = 9
             while sheet1[f"B{row_idx}"].value:
                 raw_date = sheet1[f"B{row_idx}"].value
@@ -120,7 +119,6 @@ def detect_and_extract_workbook(file_bytes, filename):
                 except (ValueError, TypeError):
                     odo_start, odo_end, calc_mileage = 0.0, 0.0, 0.0
                     
-                # FIX: Read the explicit starting location value directly from Column C instead of a generic string
                 excel_start_loc = sheet1[f"C{row_idx}"].value
                 start_location_val = str(excel_start_loc).strip() if excel_start_loc else f"{IMPORT_MARKER} (Probation)"
                     
@@ -134,11 +132,12 @@ def detect_and_extract_workbook(file_bytes, filename):
                     "Odometer End": odo_end,
                     "Calculated Mileage": round(calc_mileage, 1),
                     "Program Code": "",
-                    "_source_file": filename  # Traceability link for handling multi-sheet sorting
+                    "_source_file": filename
                 })
                 row_idx += 1
         else:
-            # Standard Garden Pathways Template Processing
+            # Standard Template Target Processing
+            template_type = "standard"
             employee_name = str(sheet1["D11"].value or "").strip()
             date_range_str = str(sheet1["D15"].value or "").strip()
             
