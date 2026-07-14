@@ -376,20 +376,24 @@ with col_dest:
             st.session_state.num_stops -= 1
             st.rerun()
 
-col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
-
-with col_purpose:
-    purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
-
-with col_prog_code:
-    program_code = st.text_input(
-        "Program Code",
-        placeholder="e.g., 101",
-        key=f"journey_prog_code_{gen}"
-    )
-
-with col_rt:
-    round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
+if st.session_state.template_type == "at_promise":
+    col_purpose, col_calc = st.columns([3, 1])
+    form_prog_code = "" # Safe empty string baseline for the database schema
+else: 
+    col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
+    
+    with col_purpose:
+        purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
+    
+    with col_prog_code:
+        program_code = st.text_input(
+            "Program Code",
+            placeholder="e.g., 101",
+            key=f"journey_prog_code_{gen}"
+        )
+    
+    with col_rt:
+        round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
 if st.session_state.template_type == "at_promise":
     st.markdown("##### Odometer Count (Probabtion Form ONLY) ")
@@ -638,7 +642,7 @@ if not st.session_state.mileage_data.empty:
     st.caption("**Tip:** Double-click the **Calculated Mileage** cell to type the exact number.")
 
     if st.session_state.template_type == "at_promise":
-        display_columns = MILEAGE_COLUMNS
+        display_columns = [col for col in MILEAGE_COLUMNS if col != "Program Code"]
         column_configuration = {
             "Calculated Mileage": st.column_config.NumberColumn(
                 "Calculated Mileage",
