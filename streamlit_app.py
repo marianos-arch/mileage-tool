@@ -593,6 +593,7 @@ else:
 
 st.markdown("---")
 
+    
 # --- UI: MILEAGE LOG TABLE
 st.header("Mileage Log Table")
 
@@ -602,7 +603,7 @@ if not st.session_state.mileage_data.empty:
     with col_metric1:
         st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
     
-    st.caption("**Tip:** double-click the **Calculated Mileage** cell to type the exact number.")
+    st.caption("**Tip:** Double-click the **Calculated Mileage** cell to type the exact number.")
 
     if st.session_state.template_type == "at_promise":
         display_columns = MILEAGE_COLUMNS
@@ -627,7 +628,7 @@ if not st.session_state.mileage_data.empty:
             )
         }
     
-    # Hide the hidden internal trace column from being modified
+    # Render the interactive data table
     edited_df = st.data_editor(
         st.session_state.mileage_data,
         column_order=display_columns, 
@@ -636,9 +637,37 @@ if not st.session_state.mileage_data.empty:
         key="mileage_editor",
         column_config=column_configuration
     )
-    st.session_state.mileage_data = edited_df
+    
+
+    if not edited_df.equals(st.session_state.mileage_data):
+        for idx in edited_df.index:
+            if idx in st.session_state.mileage_data.index:
+                old_mileage = st.session_state.mileage_data.loc[idx, "Calculated Mileage"]
+                new_mileage = edited_df.loc[idx, "Calculated Mileage"]
+                
+                if old_mileage != new_mileage:
+                    # convert odometer targets to floats
+                    odo_start = float(edited_df.loc[idx, "Odometer Start"] or 0.0)
+                    odo_end = float(edited_df.loc[idx, "Odometer End"] or 0.0)
+                    
+                    start_has_decimal = "." in str(odo_start) and not str(odo_start).endswith(".0")
+                    end_has_decimal = "." in str(odo_end) and not str(odo_end).endswith(".0")
+                    
+                    if start_has_decimal and not end_has_decimal:
+                        # Odometer Start contains the true data -> adjust End
+                        edited_df.loc[idx, "Odometer End"] = round(odo_start + new_mileage, 1)
+                    elif end_has_decimal and not start_has_decimal:
+                        # Odometer End contains the true data -> adjust Start
+                        edited_df.loc[idx, "Odometer Start"] = round(max(0.0, odo_end - new_mileage), 1)
+                    else:
+                        # Fallback default
+                        edited_df.loc[idx, "Odometer End"] = round(odo_start + new_mileage, 1)
+                        
+        # our modified calculations safely back to memory and trigger an visual update
+        st.session_state.mileage_data = edited_df
+        st.rerun()
 else:
-    st.info(" No mileage entries added yet. Use the form above to get started.")
+    st.info("No mileage entries added yet. Use the form above to get started.")
 
 st.markdown("---")
 
