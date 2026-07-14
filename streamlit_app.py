@@ -271,7 +271,7 @@ with col2:
     # Initialize tracking variables safely
     if "has_uploaded_date" not in st.session_state:
         st.session_state.has_uploaded_date = False
-
+        
     if st.session_state.has_uploaded_date and st.session_state.date_range_str:
         st.text_input(
             "Reporting Period Range", 
@@ -280,15 +280,12 @@ with col2:
             key="static_period_display"
         )
     else:
-        # 1. Define a clean callback function to handle updates safely
         def update_month_string():
             if "cs_month_select" in st.session_state:
                 picked_month = st.session_state.cs_month_select
                 days = month_days[picked_month]
                 st.session_state.date_range_str = f"{picked_month} 1 - {picked_month} {days}, 2026"
 
-        # 2. Render the select box safely WITHOUT feeding it an index derived from text
-        # If it doesn't exist yet, default it to the first month
         if "cs_month_select" not in st.session_state:
             st.session_state.cs_month_select = "January"
             
