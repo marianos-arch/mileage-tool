@@ -535,8 +535,8 @@ if submit_button:
         calculated_miles = round(calculated_miles, 1)
 
         if additional_stops:
-            stops_str = " & ".join(additional_stops)
-            combined_destination = f"{stops_str} & {dest_loc}"
+            stops_str = " -> ".join(additional_stops)
+            combined_destination = f"{stops_str} -> {dest_loc}"
         else:
             combined_destination = dest_loc
             
