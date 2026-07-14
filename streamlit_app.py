@@ -264,26 +264,23 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
-    # if the uploaded file contains a complex pre-built date range string, preserve it statically
-    if st.session_state.date_range_str and "-" in st.session_state.date_range_str:
+
+    # Track whether the user has locked in a pre-built date range from a file
+    if st.session_state.date_range_str and "-" in st.session_state.date_range_str and "uploaded_file_date_range" not in st.session_state:
+        # Only lock this if it came from a file upload (set a flag during parsing)
         st.text_input("Reporting Period Range", value=st.session_state.date_range_str, disabled=True, key="static_period_display")
     else:
-        # Fallback to manual selection if no file metadata is provided
-        try:
-            current_month_name = st.session_state.date_range_str.split(" ")[0]
-            default_idx = months.index(current_month_name) if current_month_name in months else 0
-        except (IndexError, ValueError):
-            default_idx = 0
-
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
             index=default_idx,
             key="cs_month_select"
         )
-        
         days_in_month = month_days[selected_month]
-        st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        # Only update session state if the selection changed
+        new_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        if new_range != st.session_state.date_range_str:
+            st.session_state.date_range_str = new_range
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 with col3:
