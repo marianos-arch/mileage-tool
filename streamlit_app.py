@@ -272,7 +272,7 @@ with col2:
     if "has_uploaded_date" not in st.session_state:
         st.session_state.has_uploaded_date = False
 
-    # 🟢 FIX: Check the explicit upload flag instead of the string format
+    # Check the explicit upload flag instead of the string format
     if st.session_state.has_uploaded_date and st.session_state.date_range_str:
         st.text_input(
             "Reporting Period Range", 
@@ -281,13 +281,17 @@ with col2:
             key="static_period_display"
         )
     else:
-        # Fallback to interactive manual selection
-        try:
-            current_month_name = st.session_state.date_range_str.split(" ")[0]
-            default_idx = months.index(current_month_name) if current_month_name in months else 0
-        except (IndexError, ValueError):
-            default_idx = 0
+        default_idx = 0
+        if st.session_state.get("date_range_str"):
+            try:
+                # Extract the first word (e.g., "July" from "July 1 - July 31, 2026")
+                current_month_name = st.session_state.date_range_str.split(" ")[0].strip()
+                if current_month_name in months:
+                    default_idx = months.index(current_month_name)
+            except Exception:
+                default_idx = 0
 
+        # Render select box with the corrected default index
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
@@ -295,8 +299,12 @@ with col2:
             key="cs_month_select"
         )
         
+        # Calculate matching days based on what the UI element currently says
         days_in_month = month_days[selected_month]
-        st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        
+        # Update the state securely and match captions
+        st.session_state.date_range_str = computed_range
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 with col3:
