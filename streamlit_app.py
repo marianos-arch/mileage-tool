@@ -268,11 +268,14 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
-    # Initialize tracking variables safely
-    if "has_uploaded_date" not in st.session_state:
-        st.session_state.has_uploaded_date = False
+    if st.session_state.get("uploaded_files_registry"):
+        # Grab the date range pulled from the active file metadata
+        active_files = list(st.session_state.uploaded_files_registry.values())
+        extracted_date = active_files[0].get("date_range_str", "") if active_files else ""
         
-    if st.session_state.has_uploaded_date and st.session_state.date_range_str:
+        # Keep our core session variable perfectly synced
+        st.session_state.date_range_str = extracted_date
+        
         st.text_input(
             "Reporting Period Range", 
             value=st.session_state.date_range_str, 
@@ -280,27 +283,18 @@ with col2:
             key="static_period_display"
         )
     else:
-        def update_month_string():
-            if "cs_month_select" in st.session_state:
-                picked_month = st.session_state.cs_month_select
-                days = month_days[picked_month]
-                st.session_state.date_range_str = f"{picked_month} 1 - {picked_month} {days}, 2026"
-
-        if "cs_month_select" not in st.session_state:
-            st.session_state.cs_month_select = "January"
-            
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
-            key="cs_month_select",
-            on_change=update_month_string
+            key="cs_month_select"
         )
         
-        # 3. Fallback sync to ensure date_range_str is never blank on initial render
-        if not st.session_state.get("date_range_str"):
-            days = month_days[selected_month]
-            st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days}, 2026"
-            
+        # Calculate matching days based on the manual choice
+        days_in_month = month_days[selected_month]
+        computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+        
+        # Update the state securely
+        st.session_state.date_range_str = computed_range
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 
