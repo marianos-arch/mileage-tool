@@ -554,7 +554,7 @@ if not st.session_state.mileage_data.empty:
         else:
             st.warning("Please add a valid Google Maps API Key.")
             
-st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
+        st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.")
         last_entry_index = new_app_entries.index[-1]
         
         adjusted_miles = st.number_input(
