@@ -268,11 +268,10 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
-    # Initialize the flag in state if it doesn't exist yet
+    # Initialize tracking variables safely
     if "has_uploaded_date" not in st.session_state:
         st.session_state.has_uploaded_date = False
 
-    # Check the explicit upload flag instead of the string format
     if st.session_state.has_uploaded_date and st.session_state.date_range_str:
         st.text_input(
             "Reporting Period Range", 
@@ -281,31 +280,32 @@ with col2:
             key="static_period_display"
         )
     else:
-        default_idx = 0
-        if st.session_state.get("date_range_str"):
-            try:
-                # Extract the first word (e.g., "July" from "July 1 - July 31, 2026")
-                current_month_name = st.session_state.date_range_str.split(" ")[0].strip()
-                if current_month_name in months:
-                    default_idx = months.index(current_month_name)
-            except Exception:
-                default_idx = 0
+        # 1. Define a clean callback function to handle updates safely
+        def update_month_string():
+            if "cs_month_select" in st.session_state:
+                picked_month = st.session_state.cs_month_select
+                days = month_days[picked_month]
+                st.session_state.date_range_str = f"{picked_month} 1 - {picked_month} {days}, 2026"
 
-        # Render select box with the corrected default index
+        # 2. Render the select box safely WITHOUT feeding it an index derived from text
+        # If it doesn't exist yet, default it to the first month
+        if "cs_month_select" not in st.session_state:
+            st.session_state.cs_month_select = "January"
+            
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
-            index=default_idx,
-            key="cs_month_select"
+            key="cs_month_select",
+            on_change=update_month_string
         )
         
-        # Calculate matching days based on what the UI element currently says
-        days_in_month = month_days[selected_month]
-        computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
-        
-        # Update the state securely and match captions
-        st.session_state.date_range_str = computed_range
+        # 3. Fallback sync to ensure date_range_str is never blank on initial render
+        if not st.session_state.get("date_range_str"):
+            days = month_days[selected_month]
+            st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days}, 2026"
+            
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
+
 
 with col3:
     if st.session_state.template_type == "at_promise":
