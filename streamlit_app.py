@@ -268,33 +268,75 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
-    if st.session_state.get("uploaded_files_registry"):
-        # Grab the date range pulled from the active file metadata
-        active_files = list(st.session_state.uploaded_files_registry.values())
-        extracted_date = active_files[0].get("date_range_str", "") if active_files else ""
+    # 1. HELPER FUNCTION: Extracts a readable Month Name from almost any format
+    def extract_month_name(date_str):
+        if not date_str or not isinstance(date_str, str):
+            return None
+        date_str = date_str.strip()
         
-        # Keep our core session variable perfectly synced
-        st.session_state.date_range_str = extracted_date
+        # Scenario A: Standard Slash/Hyphen dates (e.g., 1/10/2026 or 07-15-2026)
+        # We split on slashes or dashes to isolate the leading numbers
+        cleaned_str = date_str.replace("-", "/")
+        if "/" in cleaned_str:
+            parts = cleaned_str.split("/")
+            if parts[0].isdigit():
+                month_num = int(parts[0])
+                if 1 <= month_num <= 12:
+                    return months[month_num - 1]
+                    
+        # Scenario B: Word-based formats (e.g., "July 1 - July 31, 2026")
+        for m in months:
+            if m.lower() in date_str.lower():
+                return m
+                
+        return None
+
+    # 2. FILE REGISTRY ANALYSIS
+    detected_months = []
+    active_files = list(st.session_state.get("uploaded_files_registry", {}).values())
+
+    for f in active_files:
+        raw_date_field = f.get("date_range_str", "")
+        parsed_month = extract_month_name(raw_date_field)
+        if parsed_month:
+            detected_months.append(parsed_month)
+
+    # 3. RULE ENGINE: Decide whether to lock or let them select
+    # Lock ONLY if files exist and EVERY file has successfully yielded a valid month
+    should_lock = len(active_files) > 0 and len(detected_months) == len(active_files)
+
+    if should_lock:
+        # If both files match, grab the month (or fall back to the first file's month)
+        locked_month = detected_months[0]
+        days = month_days[locked_month]
+        
+        # Hardlock the reporting period
+        st.session_state.date_range_str = f"{locked_month} 1 - {locked_month} {days}, 2026"
         
         st.text_input(
-            "Reporting Period Range", 
+            "Reporting Period Range (Locked from Import)", 
             value=st.session_state.date_range_str, 
             disabled=True, 
             key="static_period_display"
         )
     else:
+        # Fallback to Manual Selection if missing data, empty files, or mixed results
+        # Find default index based on current session state if available
+        default_idx = 0
+        current_state_month = extract_month_name(st.session_state.get("date_range_str", ""))
+        if current_state_month in months:
+            default_idx = months.index(current_state_month)
+
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
+            index=default_idx,
             key="cs_month_select"
         )
         
-        # Calculate matching days based on the manual choice
+        # Keep everything synchronized and formatted
         days_in_month = month_days[selected_month]
-        computed_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
-        
-        # Update the state securely
-        st.session_state.date_range_str = computed_range
+        st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 
