@@ -565,32 +565,32 @@ if not st.session_state.mileage_data.empty:
             format="%.1f",
             key=f"map_override_{last_entry_index}"
         )
-        
         if adjusted_miles != float(trip_miles):
             # 1. Update the Calculated Mileage
             st.session_state.mileage_data.at[last_entry_index, "Calculated Mileage"] = round(adjusted_miles, 1)
             
-            # 2. Extract current odometer values for the last row
+            # 2. Extract current odometer values
             raw_start = st.session_state.mileage_data.at[last_entry_index, "Odometer Start"]
             raw_end = st.session_state.mileage_data.at[last_entry_index, "Odometer End"]
             
-            # Safely cast them to float
             odo_start = float(raw_start or 0.0)
             odo_end = float(raw_end or 0.0)
             
-            # 3. Check for decimal precision (.1, .6, etc. and not just .0)
-            start_has_decimal = "." in str(odo_start) and not str(odo_start).endswith(".0")
-            end_has_decimal = "." in str(odo_end) and not str(odo_end).endswith(".0")
+            # 3. Determine which value is a clean whole number (ends in .0 when cast to float)
+            start_is_whole = odo_start.is_integer()
+            end_is_whole = odo_end.is_integer()
             
-            # 4. Adjust the matching odometer based on who has the decimal
-            if start_has_decimal and not end_has_decimal:
-                # Start has the decimal -> recalculate End Odometer
+            # 4. Lock the whole number, change the decimal number
+            if start_is_whole and not end_is_whole:
+                # Start is a whole number -> Lock Start, Change End
                 st.session_state.mileage_data.at[last_entry_index, "Odometer End"] = round(odo_start + adjusted_miles, 1)
-            elif end_has_decimal and not start_has_decimal:
-                # End has the decimal -> recalculate Start Odometer
+                
+            elif end_is_whole and not start_is_whole:
+                # End is a whole number -> Lock End, Change Start
                 st.session_state.mileage_data.at[last_entry_index, "Odometer Start"] = round(max(0.0, odo_end - adjusted_miles), 1)
+                
             else:
-                # Default fallback: update End Odometer
+                # Fallback: If both are whole numbers or both are decimals, default to updating the End Odometer
                 st.session_state.mileage_data.at[last_entry_index, "Odometer End"] = round(odo_start + adjusted_miles, 1)
                 
             st.rerun()
