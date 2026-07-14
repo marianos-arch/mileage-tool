@@ -597,8 +597,15 @@ if not st.session_state.mileage_data.empty:
         
         st.markdown("##### Actions")
         col_copy, col_print = st.columns(2)
+
         with col_copy:
-            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}"
+            raw_name = st.session_state.get("employee_name", "")
+            # take the first letter of each word, and capitalize it
+            name_parts = raw_name.split()
+            initials = "".join([part[0].upper() for part in name_parts if part])
+            # append it only if initials were successfully generated
+            initials_suffix = f" | Initials: {initials}" if initials else ""
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}{initials_suffix}"
             st.code(text_to_copy, language="text")
             st.caption("📋 Click the copy icon to save trip details")
                 
