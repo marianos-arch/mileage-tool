@@ -209,8 +209,50 @@ st.header("Mileage Excel Template Upload 🗂️")
 uploaded_templates = st.file_uploader(
     "Upload your mileage excel sheet (.xlsx)", 
     type=["xlsx"], 
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    key="excel_file_uploader"
 )
+
+# Check if a previously uploaded file has been removed/clicked out
+if "uploaded_files_registry" in st.session_state and st.session_state.uploaded_files_registry:
+    # Get the filenames currently sitting in the file uploader widget
+    current_uploader_names = [f.name for f in uploaded_templates] if uploaded_templates else []
+    
+    # Identify files that exist in our app registry but are missing from the uploader
+    registered_names = list(st.session_state.uploaded_files_registry.keys())
+    removed_files = [name for name in registered_names if name not in current_uploader_names]
+    
+    if removed_files:
+        for f_name in removed_files:
+            # Remove from registry and hash set
+            st.session_state.uploaded_files_registry.pop(f_name, None)
+            st.session_state.processed_file_hashes.discard(f_name)
+            
+            # Safely remove only the rows imported from this specific file, keeping manual entries intact
+            if not st.session_state.mileage_data.empty and "_source_file" in st.session_state.mileage_data.columns:
+                st.session_state.mileage_data = st.session_state.mileage_data[
+                    st.session_state.mileage_data["_source_file"] != f_name
+                ]
+        
+        # If NO files are left in the registry, reset the cover sheet metadata to blank
+        if not st.session_state.uploaded_files_registry:
+            st.session_state.employee_name = ""
+            st.session_state.date_range_str = ""
+            st.session_state.has_uploaded_date = False
+            # Clear out the visual widget states
+            st.session_state.pop("cs_employee_name", None)
+            st.session_state.pop("cs_month_select", None)
+        else:
+            # If files still remain, fall back to the metadata of the remaining file
+            remaining_file = list(st.session_state.uploaded_files_registry.values())[0]
+            st.session_state.template_type = remaining_file["template_type"]
+            st.session_state.employee_name = remaining_file["employee_name"]
+            st.session_state.date_range_str = remaining_file["date_range_str"]
+            st.session_state.rate_per_mile = remaining_file["rate_per_mile"]
+            
+        st.toast("🗑️ File removed and database synchronized.")
+        st.rerun()
+
 
 if uploaded_templates:
     state_updated = False
@@ -220,6 +262,11 @@ if uploaded_templates:
             parsed_result = detect_and_extract_workbook(file_bytes, uploaded_file.name)
             
             if parsed_result:
+                # Add filename to row data so we can track and filter it during deletion
+                if parsed_result["rows"]:
+                    for r in parsed_result["rows"]:
+                        r["_source_file"] = uploaded_file.name
+                
                 st.session_state.uploaded_files_registry[uploaded_file.name] = parsed_result
                 st.session_state.processed_file_hashes.add(uploaded_file.name)
                 
