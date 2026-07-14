@@ -164,13 +164,17 @@ def detect_and_extract_workbook(file_bytes, filename):
                         "_source_file": filename
                     })
                     row_idx += 1
-                    
+
+        # Check if the extracted date string actually has content
+        has_uploaded_date = bool(date_range_str and date_range_str.strip())
+        
         return {
             "filename": filename,
             "bytes": file_bytes,
             "template_type": template_type,
             "employee_name": employee_name,
             "date_range_str": date_range_str,
+            "has_uploaded_date": has_uploaded_date,
             "rate_per_mile": rate_per_mile,
             "imported_count": len(existing_rows),
             "rows": existing_rows
@@ -264,23 +268,35 @@ with col2:
         "September": 30, "October": 31, "November": 30, "December": 31
     }
 
+    # Initialize the flag in state if it doesn't exist yet
+    if "has_uploaded_date" not in st.session_state:
+        st.session_state.has_uploaded_date = False
 
-    # Track whether the user has locked in a pre-built date range from a file
-    if st.session_state.date_range_str and "-" in st.session_state.date_range_str and "uploaded_file_date_range" not in st.session_state:
-        # Only lock this if it came from a file upload (set a flag during parsing)
-        st.text_input("Reporting Period Range", value=st.session_state.date_range_str, disabled=True, key="static_period_display")
+    # 🟢 FIX: Check the explicit upload flag instead of the string format
+    if st.session_state.has_uploaded_date and st.session_state.date_range_str:
+        st.text_input(
+            "Reporting Period Range", 
+            value=st.session_state.date_range_str, 
+            disabled=True, 
+            key="static_period_display"
+        )
     else:
+        # Fallback to interactive manual selection
+        try:
+            current_month_name = st.session_state.date_range_str.split(" ")[0]
+            default_idx = months.index(current_month_name) if current_month_name in months else 0
+        except (IndexError, ValueError):
+            default_idx = 0
+
         selected_month = st.selectbox(
             "Select Reporting Month (2026)",
             options=months,
             index=default_idx,
             key="cs_month_select"
         )
+        
         days_in_month = month_days[selected_month]
-        # Only update session state if the selection changed
-        new_range = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
-        if new_range != st.session_state.date_range_str:
-            st.session_state.date_range_str = new_range
+        st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
         st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
 with col3:
