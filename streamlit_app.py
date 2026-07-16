@@ -644,60 +644,6 @@ elif current_step == 3:
                 }
                 st.rerun()
 
-    # --- DYNAMIC PREVIEW SUMMARY CARD ---
-    # Shows up right away if st.session_state.temp_preview_trip contains computed distance details
-    if st.session_state.temp_preview_trip is not None:
-        trip = st.session_state.temp_preview_trip
-        
-        st.subheader("🔍 Calculated Route Review")
-        
-        # Design a distinct and beautiful review summary card
-        preview_card = st.container(border=True)
-        with preview_card:
-            col_left, col_right = st.columns([2, 1])
-            
-            with col_left:
-                st.markdown(f"🗓️ **Date:** `{trip['Date']}`")
-                st.markdown(f"🛫 **Starting From:** {trip['Starting Location']}")
-                st.markdown(f"🏁 **Ending At:** {trip['Destination']}")
-                if trip['Purpose of Travel']:
-                    st.markdown(f"💼 **Purpose:** *{trip['Purpose of Travel']}*")
-                if trip['Program Code']:
-                    st.markdown(f"🏷️ **Program Code:** `{trip['Program Code']}`")
-                
-                # Dynamic Odometer feedback message inside the card
-                if st.session_state.template_type == "at_promise":
-                    st.info(f"📊 **Odometer Calculation:** {trip['Odometer Start']} ➔ {trip['Odometer End']}")
-
-            with col_right:
-                # Big bold summary KPI Callout
-                st.markdown("<p style='text-align: center; margin-bottom: 0px;'>Distance Calculated</p>", unsafe_allow_html=True)
-                st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin-top: 0px;'>{trip['Calculated Mileage']} <span style='font-size: 18px;'>mi</span></h1>", unsafe_allow_html=True)
-                
-                # Form Action confirmations
-                col_save, col_cancel = st.columns(2)
-                with col_save:
-                    save_btn = st.button("Confirm & Log", type="primary", use_container_width=True)
-                with col_cancel:
-                    cancel_btn = st.button("Cancel", type="secondary", use_container_width=True)
-                    
-                if save_btn:
-                    # Append temp details straight into mileage_data
-                    st.session_state.mileage_data = pd.concat(
-                        [st.session_state.mileage_data, pd.DataFrame([trip])],
-                        ignore_index=True
-                    )
-                    st.session_state.temp_preview_trip = None
-                    st.session_state.form_generation += 1
-                    st.session_state.num_stops = 0
-                    st.success("🎉 Trip added to mileage logs successfully!")
-                    st.rerun()
-                    
-                if cancel_btn:
-                    st.session_state.temp_preview_trip = None
-                    st.rerun()
-                    
-
     # Map details and print view for the calculated draft route
     if st.session_state.temp_preview_trip is not None: 
         preview = st.session_state.temp_preview_trip
