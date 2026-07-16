@@ -313,7 +313,7 @@ if current_step == 1:
             st.button("Continue to Cover Sheet Setup ➡️", on_click=go_to_step, args=(2,), use_container_width=True)
             
 # ==========================================
-# STEP 2: COVER SHEET METADATA
+# STEP 2: COVER SHEET
 # ==========================================
 elif current_step == 2:
     st.header("Cover Sheet Information")
@@ -521,9 +521,9 @@ elif current_step == 3:
             st.session_state.num_stops -= 1 
             st.rerun() 
 
-    # --- SECTION 2: WORKBOOK & METADATA SECTION ---
+    # --- SECTION 2: WORKBOOK ---
     st.markdown("---")
-    st.subheader("2. Travel Purpose & Metadata")
+    st.subheader("2. Travel Purpose")
     
     # Determine fields based on configurations
     active_registry = st.session_state.get("uploaded_files_registry", {})
