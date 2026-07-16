@@ -771,19 +771,6 @@ elif current_step == 4:
     st.header("Review & Export")
 
     if not st.session_state.mileage_data.empty:
-        # Running tally section for reassurance
-        total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
-        reimbursement_amt = total_miles * st.session_state.rate_per_mile
-        
-        col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
-        with col_m1:
-            st.metric("Total Period Mileage (All Entries)", f"{total_miles:.1f} miles")
-        with col_m2:
-            st.metric("Reimbursement Rate", f"${st.session_state.rate_per_mile:.3f} / mi")
-        with col_m3:
-            st.metric("Estimated Reimbursement", f"${reimbursement_amt:.2f}")
-
-        st.markdown("---")
         st.subheader("Edit/Verify Logs")
         st.caption("**Tip:** Double-click any calculated mileage cell to make manual corrections directly in the sheet tables below.")
 
@@ -806,6 +793,20 @@ elif current_step == 4:
                     if file_subset.empty:
                         st.info("No logs generated or imported for this workbook yet.")
                         continue
+
+                    # --- 1. NEW: SCOPED TALLY SECTION PER TAB ---
+                    tab_total_miles = file_subset["Calculated Mileage"].sum()
+                    tab_reimbursement_amt = tab_total_miles * st.session_state.rate_per_mile
+                    
+                    col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
+                    with col_m1:
+                        st.metric("Total Workbook Mileage", f"{tab_total_miles:.1f} miles")
+                    with col_m2:
+                        st.metric("Reimbursement Rate", f"${st.session_state.rate_per_mile:.3f} / mi")
+                    with col_m3:
+                        st.metric("Estimated Reimbursement", f"${tab_reimbursement_amt:.2f}")
+
+                    st.markdown("---")
 
                     # Set up columns based on the specific template type of this tab
                     if is_probation:
@@ -867,10 +868,23 @@ elif current_step == 4:
                         st.session_state.mileage_data.update(edited_subset)
                         st.rerun()
         else:
-            # Fallback if no files are uploaded yet (just display a clean default editor)
+            # Fallback if no files are uploaded yet (just display a clean default editor and global metrics)
             st.info("Upload Excel templates in Step 1 to organize logs into workbook tabs.")
-            display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
             
+            total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
+            reimbursement_amt = total_miles * st.session_state.rate_per_mile
+            
+            col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
+            with col_m1:
+                st.metric("Total Period Mileage", f"{total_miles:.1f} miles")
+            with col_m2:
+                st.metric("Reimbursement Rate", f"${st.session_state.rate_per_mile:.3f} / mi")
+            with col_m3:
+                st.metric("Estimated Reimbursement", f"${reimbursement_amt:.2f}")
+
+            st.markdown("---")
+            
+            display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
             edited_df = st.data_editor(
                 st.session_state.mileage_data,
                 column_order=display_columns, 
