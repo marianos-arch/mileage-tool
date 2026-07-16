@@ -311,127 +311,125 @@ if current_step == 1:
         if len(st.session_state.uploaded_files_registry) > 0:
             st.success("🎉 Base template(s) loaded successfully!")
             st.button("Continue to Cover Sheet Setup ➡️", on_click=go_to_step, args=(2,), use_container_width=True)
-
+            
 # ==========================================
 # STEP 2: COVER SHEET METADATA
 # ==========================================
 elif current_step == 2:
-    st.header("Cover Sheet Information") # [cite: 35]
-    col1, col2, col3 = st.columns([2, 2, 1]) # [cite: 35]
+    st.header("Cover Sheet Information")
+    col1, col2, col3 = st.columns([2, 2, 1])
 
     with col1:
-        if st.session_state.employee_name and not st.session_state.get("cs_employee_name"): # [cite: 35]
-            st.session_state["cs_employee_name"] = st.session_state.employee_name # [cite: 35, 36]
+        # Properly synchronize session states without typing interference
+        if "cs_employee_name" not in st.session_state:
+            st.session_state["cs_employee_name"] = st.session_state.employee_name
 
-        employee_name = st.text_input( # [cite: 36]
+        employee_name = st.text_input(
             "Employee Name",
             placeholder="John Doe",
             key="cs_employee_name"
-        ) # [cite: 36]
-        st.session_state.employee_name = employee_name # [cite: 36]
+        )
+        st.session_state.employee_name = employee_name
 
     with col2:
         months = [
             "January", "February", "March", "April", "May", "June", 
             "July", "August", "September", "October", "November", "December"
-        ] # [cite: 36]
+        ]
         month_days = {
-            "January": 31, "February": 28, "March": 31, "April": 30, # [cite: 36, 37]
+            "January": 31, "February": 28, "March": 31, "April": 30, 
             "May": 31, "June": 30, "July": 31, "August": 31, 
             "September": 30, "October": 31, "November": 30, "December": 31
-        } # [cite: 37]
+        }
 
-        def extract_month_name(date_str): # [cite: 37]
-            if not date_str or not isinstance(date_str, str): # [cite: 37]
+        def extract_month_name(date_str):
+            if not date_str or not isinstance(date_str, str):
                 return None
-            date_str = date_str.strip() # [cite: 37]
-            cleaned_str = date_str.replace("-", "/") # [cite: 38]
-            if "/" in cleaned_str: # [cite: 38]
-                parts = cleaned_str.split("/") # [cite: 38]
-                if parts[0].isdigit(): # [cite: 38]
-                    month_num = int(parts[0]) # [cite: 38, 39]
-                    if 1 <= month_num <= 12: # [cite: 39]
-                        return months[month_num - 1] # [cite: 39]
-            for m in months: # [cite: 39, 40]
-                if m.lower() in date_str.lower(): # [cite: 40]
-                    return m # [cite: 40]
-            return None # [cite: 40]
+            date_str = date_str.strip()
+            cleaned_str = date_str.replace("-", "/")
+            if "/" in cleaned_str:
+                parts = cleaned_str.split("/")
+                if parts[0].isdigit():
+                    month_num = int(parts[0])
+                    if 1 <= month_num <= 12:
+                        return months[month_num - 1]
+            for m in months:
+                if m.lower() in date_str.lower():
+                    return m
+            return None
 
-        detected_months = [] # [cite: 40]
-        active_files = list(st.session_state.get("uploaded_files_registry", {}).values()) # [cite: 40]
+        detected_months = []
+        active_files = list(st.session_state.get("uploaded_files_registry", {}).values())
 
-        for f in active_files: # [cite: 40]
-            raw_date_field = f.get("date_range_str", "") # [cite: 40]
-            parsed_month = extract_month_name(raw_date_field) # [cite: 41]
-            if parsed_month: # [cite: 41]
-                detected_months.append(parsed_month) # [cite: 41]
+        for f in active_files:
+            raw_date_field = f.get("date_range_str", "")
+            parsed_month = extract_month_name(raw_date_field)
+            if parsed_month:
+                detected_months.append(parsed_month)
 
-        should_lock = len(active_files) > 0 and len(detected_months) == len(active_files) # [cite: 41]
+        should_lock = len(active_files) > 0 and len(detected_months) == len(active_files)
 
-        if should_lock: # [cite: 41]
-            locked_month = detected_months[0] # [cite: 41, 42]
-            days = month_days[locked_month] # [cite: 42]
-            st.session_state.date_range_str = f"{locked_month} 1 - {locked_month} {days}, 2026" # [cite: 42]
-            st.text_input( # [cite: 42]
-                "Reporting Period Range (Locked from Import)", # [cite: 42]
-                value=st.session_state.date_range_str, # [cite: 42, 43]
+        if should_lock:
+            locked_month = detected_months[0]
+            days = month_days[locked_month]
+            st.session_state.date_range_str = f"{locked_month} 1 - {locked_month} {days}, 2026"
+            st.text_input(
+                "Reporting Period Range (Locked from Import)", 
+                value=st.session_state.date_range_str, 
                 disabled=True, 
                 key="static_period_display"
-            ) # [cite: 43]
+            )
         else:
-            default_idx = 0 # [cite: 43]
-            current_state_month = extract_month_name(st.session_state.get("date_range_str", "")) # [cite: 43, 44]
-            if current_state_month in months: # [cite: 44]
-                default_idx = months.index(current_state_month) # [cite: 44]
+            default_idx = 0
+            current_state_month = extract_month_name(st.session_state.get("date_range_str", ""))
+            if current_state_month in months:
+                default_idx = months.index(current_state_month)
 
-            selected_month = st.selectbox( # [cite: 44]
+            selected_month = st.selectbox(
                 "Select Reporting Month (2026)",
                 options=months,
                 index=default_idx,
                 key="cs_month_select"
-            ) # [cite: 44]
+            )
             
-            days_in_month = month_days[selected_month] # [cite: 45]
-            st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026" # [cite: 45]
-            st.caption(f" **Formatted Range:** {st.session_state.date_range_str}") # [cite: 45]
+            days_in_month = month_days[selected_month]
+            st.session_state.date_range_str = f"{selected_month} 1 - {selected_month} {days_in_month}, 2026"
+            st.caption(f" **Formatted Range:** {st.session_state.date_range_str}")
 
     with col3:
-        if st.session_state.template_type == "at_promise": # [cite: 45]
-            rate_per_mile = st.number_input( # [cite: 45]
+        if st.session_state.template_type == "at_promise":
+            rate_per_mile = st.number_input(
                 "Rate per Mile ($)",
-                value=float(st.session_state.rate_per_mile), # [cite: 45, 46]
-                min_value=0.0, # [cite: 46]
+                value=float(st.session_state.rate_per_mile),
+                min_value=0.0,
                 step=0.01,
                 format="%.3f",
                 key="cs_rate_per_mile"
-            ) # [cite: 46]
-            st.session_state.rate_per_mile = rate_per_mile # [cite: 46]
+            )
+            st.session_state.rate_per_mile = rate_per_mile
         else:
-            st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE # [cite: 46]
+            st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE
 
     # --- NAVIGATION BUTTONS
     col_back, col_next = st.columns(2)
     with col_back:
         st.button("⬅️ Back to Upload", on_click=go_to_step, args=(1,), use_container_width=True)
     with col_next:
-        # Show "Next" button only if they have filled in their name
         if st.session_state.employee_name:
             st.button("Continue to Journey Logger ➡️", on_click=go_to_step, args=(3,), use_container_width=True)
         else:
             st.warning("⚠️ Please enter your Employee Name to proceed.")
 
+
 # ==========================================
 # STEP 3: LOG NEW TRIPS & VIEW MAP ROUTES
 # ==========================================
-
 elif current_step == 3:
     st.header("Track Your Journey")
 
-    # Ensure a session state key exists for holding our unsubmitted "draft" trip
     if "temp_preview_trip" not in st.session_state:
         st.session_state.temp_preview_trip = None
 
-    # Add Journey Entry Form 
     if "form_generation" not in st.session_state:
         st.session_state.form_generation = 0 
 
@@ -508,38 +506,33 @@ elif current_step == 3:
     has_standard = any(meta["template_type"] == "standard" for meta in active_registry.values())
     
     if active_registry:
-        # If templates are uploaded, show the program code if at least one standard template is active
         show_program_code = has_standard
     else:
-        # Fallback default if no files are uploaded yet
         show_program_code = (st.session_state.template_type == "standard")
     
+    # Safely define baseline variable defaults to prevent local NameErrors
+    program_code = ""
+    round_trip = "Yes"
+
     # --- UI: DYNAMIC FORM FIELDS
     if not show_program_code:
-        # --- "At-Promise" ONLY Mode: Hide program code
         col_purpose, col_calc = st.columns([3, 1])
-        program_code = ""  # Fixed: defined as empty string to prevent NameError later
-        round_trip = "Yes" # Default fallback for at-promise calculations
-        
         with col_purpose:
             purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
     else: 
-        # --- Standard Mode (Standard ONLY or Mixed Templates): Show program code
         col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
-        
         with col_purpose:
             purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
-        
         with col_prog_code:
             program_code = st.text_input(
                 "Program Code",
                 placeholder="e.g., 101",
                 key=f"journey_prog_code_{gen}"
             )
-        
         with col_rt:
             round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
+    # --- ODOMETER FIELDS
     if st.session_state.template_type == "at_promise": 
         st.markdown("##### Odometer Count (Probation Form ONLY) ") 
         col_odo_start, col_odo_end = st.columns(2) 
@@ -550,7 +543,6 @@ elif current_step == 3:
                 placeholder="e.g., 45100",
                 key=f"journey_odo_start_{gen}"
             ) 
-
         with col_odo_end:
             odo_end_input = st.text_input( 
                 "Odometer End",
@@ -560,10 +552,8 @@ elif current_step == 3:
     else:
         odo_start_input = "" 
         odo_end_input = ""
-        round_trip = "Yes" if 'round_trip' not in locals() else round_trip
-        program_code = "" if 'program_code' not in locals() else program_code
 
-    # BUTTON 1: CALCULATE & PREVIEW (Changes from original Add Entry button)
+    # BUTTON 1: CALCULATE & PREVIEW
     calculate_button = st.button("Calculate & Preview Route 🗺️", type="secondary", key=f"journey_calc_btn_{gen}", use_container_width=True) 
 
     if calculate_button: 
@@ -591,13 +581,15 @@ elif current_step == 3:
                 combined_destination = f"{combined_destination} (RT)" 
 
             def parse_to_float(val): 
+                if not val or not str(val).strip():
+                    return None
                 try:
                     return round(float(val.strip()), 1) 
                 except ValueError:
                     return None 
 
-            o_start = parse_to_float(odo_start_input) if odo_start_input.strip() else None 
-            o_end = parse_to_float(odo_end_input) if odo_end_input.strip() else None 
+            o_start = parse_to_float(odo_start_input)
+            o_end = parse_to_float(odo_end_input)
             
             if o_start is not None and o_end is None: 
                 o_end = round(o_start + calculated_miles, 1) 
@@ -609,7 +601,6 @@ elif current_step == 3:
             else:
                 o_start, o_end = 0.0, round(calculated_miles, 1) 
 
-            # Instead of appending straight to the log, save to a temporary draft state
             st.session_state.temp_preview_trip = {
                 "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date), 
                 "Starting Location": start_loc, 
@@ -628,7 +619,6 @@ elif current_step == 3:
 
     # Map details and print view for the calculated draft route
     if st.session_state.temp_preview_trip is not None: 
-        # Map variables are pulled directly from the current preview draft
         preview = st.session_state.temp_preview_trip
         origin = preview["Starting Location"] 
         raw_destination = str(preview["Destination"]) 
@@ -682,6 +672,7 @@ elif current_step == 3:
                 
             encoded_embed_waypoints = "|".join([urllib.parse.quote_plus(wp) for wp in embed_waypoints]) 
         
+            # FIX: Used the correct and authorized Google Maps Embed API endpoint
             map_url = ( 
                 f"https://www.google.com/maps/embed/v1/directions" 
                 f"?key={api_key}" 
@@ -743,10 +734,9 @@ elif current_step == 3:
             )
             st.caption("press **Ctrl+P** to print out the Map Route") 
 
-        # BUTTON 2: SUBMIT TRIP (Appends to database & advances wizard state)
+        # BUTTON 2: SUBMIT TRIP (Modified to safely redirect using on_click callback routing)
         st.write(" ")
-        submit_log_btn = st.button("🎯 Submit Trip to Log & Continue", type="primary", use_container_width=True)
-        if submit_log_btn:
+        def handle_submit():
             st.session_state.mileage_data = pd.concat(
                 [st.session_state.mileage_data, pd.DataFrame([st.session_state.temp_preview_trip])],
                 ignore_index=True
@@ -754,8 +744,14 @@ elif current_step == 3:
             st.session_state.temp_preview_trip = None
             st.session_state.form_generation += 1 
             st.session_state.num_stops = 0 
-            st.toast("✅ Trip successfully added to your final log!")
-            go_to_step(4)  # Take them automatically to Step 4 to review and export!
+            go_to_step(4)
+
+        submit_log_btn = st.button(
+            "🎯 Submit Trip to Log & Continue", 
+            type="primary", 
+            use_container_width=True,
+            on_click=handle_submit
+        )
 
     else:
         st.info("💡 Fill out the form fields above and click 'Calculate & Preview Route' to generate your route map.")
@@ -767,6 +763,7 @@ elif current_step == 3:
         st.button("⬅️ Back to Cover Sheet", on_click=go_to_step, args=(2,), use_container_width=True)
     with col_next_fallback:
         st.button("Skip to Review & Export ➡️", on_click=go_to_step, args=(4,), use_container_width=True)
+
 # ==========================================
 # STEP 4: MILEAGE LOG TABLE & EXPORT BACK TO EXCEL
 # ==========================================
