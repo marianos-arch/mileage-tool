@@ -425,7 +425,8 @@ elif current_step == 2:
 # STEP 3: LOG NEW TRIPS & VIEW MAP ROUTES
 # ==========================================
 elif current_step == 3:
-    st.header("Track Your Journey")
+    st.header("📍 Track Your Journey")
+    st.markdown("Calculate distances, add dynamic stops along your route, and track travel details below.")
 
     if "temp_preview_trip" not in st.session_state:
         st.session_state.temp_preview_trip = None
@@ -433,75 +434,98 @@ elif current_step == 3:
     if "form_generation" not in st.session_state:
         st.session_state.form_generation = 0 
 
-    gen = st.session_state.form_generation 
-    today = datetime.date.today() 
-    col_date, col_start, col_dest = st.columns(3) 
-
-    with col_date:
-        travel_date = st.date_input("Date", value=today, key=f"journey_travel_date_{gen}") 
-
-    with col_start:
-        st.write("**Starting Location**") 
-        selected_shortcut = st.selectbox( 
-            "Quick Select Location",
-            options=list(COMMON_LOCATIONS.keys()),
-            key=f"start_shortcut_{gen}",
-            label_visibility="collapsed"
-        ) 
-        
-        if selected_shortcut == "Custom / Type Address...": 
-            start_loc = st_searchbox( 
-                search_google_places, 
-                key=f"start_location_search_{gen}",
-                placeholder="Type custom starting address..."
-            ) 
-        else:
-            start_loc = COMMON_LOCATIONS[selected_shortcut] 
-            st.info(f"**Using:** {start_loc}") 
-
     if "num_stops" not in st.session_state:
         st.session_state.num_stops = 0 
 
-    with col_dest:
-        st.write("**Final Destination**") 
-        selected_dest_shortcut = st.selectbox( 
-            "Quick Select Destination",
-            options=list(COMMON_LOCATIONS.keys()), 
-            key=f"dest_shortcut_{gen}", 
-            label_visibility="collapsed"
-        ) 
+    gen = st.session_state.form_generation 
+    today = datetime.date.today() 
 
-        if selected_dest_shortcut == "Custom / Type Address...": 
-            dest_loc = st_searchbox( 
-                search_google_places,
-                key=f"destination_search_{gen}",
-                placeholder="Type final destination address..."
+    # --- SECTION 1: ROUTE & ADDRESS CONFIGURATION ---
+    st.subheader("1. Route Details")
+    
+    # Date Selection Row (keeps it neat and concise)
+    col_date, _ = st.columns([1, 2])
+    with col_date:
+        travel_date = st.date_input("Date of Travel", value=today, key=f"journey_travel_date_{gen}")
+
+    # Start & Destination side-by-side card container
+    route_container = st.container(border=True)
+    with route_container:
+        col_start, col_dest = st.columns(2)
+
+        # Starting Location Column
+        with col_start:
+            st.markdown("**Departure Point**")
+            selected_shortcut = st.selectbox( 
+                "Quick select standard location:",
+                options=list(COMMON_LOCATIONS.keys()),
+                key=f"start_shortcut_{gen}"
             ) 
-        else:
-            dest_loc = COMMON_LOCATIONS[selected_dest_shortcut] 
-            st.info(f"**Using:** {dest_loc}") 
             
-        additional_stops = [] 
-        for i in range(st.session_state.num_stops): 
-            stop = st_searchbox( 
-                search_google_places,
-                key=f"stop_search_{i}_{gen}",
-                placeholder=f"Type stop address #{i+1}..."
+            if selected_shortcut == "Custom / Type Address...": 
+                start_loc = st_searchbox( 
+                    search_google_places, 
+                    key=f"start_location_search_{gen}",
+                    placeholder="🔍 Type starting address..."
+                ) 
+            else:
+                start_loc = COMMON_LOCATIONS[selected_shortcut] 
+                st.caption(f"📍 Selected: `{start_loc}`") 
+
+        # Final Destination Column
+        with col_dest:
+            st.markdown("**Arrival Destination**")
+            selected_dest_shortcut = st.selectbox( 
+                "Quick select standard location:",
+                options=list(COMMON_LOCATIONS.keys()), 
+                key=f"dest_shortcut_{gen}"
             ) 
-            if stop: 
-                additional_stops.append(stop) 
-                
-        c_add, c_rem = st.columns(2) 
-        with c_add:
-            if st.button("✚ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True): 
-                st.session_state.num_stops += 1 
-                st.rerun() 
-        with c_rem:
-            if st.button("▬ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0: 
-                st.session_state.num_stops -= 1 
-                st.rerun() 
-                
-    # --- DETERMINE FIELD VISIBILITY BASED ON ALL UPLOADED FILES
+
+            if selected_dest_shortcut == "Custom / Type Address...": 
+                dest_loc = st_searchbox( 
+                    search_google_places,
+                    key=f"destination_search_{gen}",
+                    placeholder="🔍 Type destination address..."
+                ) 
+            else:
+                dest_loc = COMMON_LOCATIONS[selected_dest_shortcut] 
+                st.caption(f"📍 Selected: `{dest_loc}`")
+
+    # --- INTERMEDIATE STOPS SUBSECTION ---
+    st.markdown("##### Multi-Stop Route Planning")
+    
+    # If we have active stops, display them inside a cleanly bordered list
+    if st.session_state.num_stops > 0:
+        stops_container = st.container(border=True)
+        with stops_container:
+            additional_stops = [] 
+            for i in range(st.session_state.num_stops): 
+                stop = st_searchbox( 
+                    search_google_places,
+                    key=f"stop_search_{i}_{gen}",
+                    placeholder=f"🔍 Search address for intermediate stop #{i+1}..."
+                ) 
+                if stop: 
+                    additional_stops.append(stop)
+    else:
+        additional_stops = []
+
+    # Dynamic Control Buttons (Pills/Inline look)
+    col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+    with col_btn1:
+        if st.button("✚ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True): 
+            st.session_state.num_stops += 1 
+            st.rerun() 
+    with col_btn2:
+        if st.button("▬ Remove", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0: 
+            st.session_state.num_stops -= 1 
+            st.rerun() 
+
+    # --- SECTION 2: WORKBOOK & METADATA SECTION ---
+    st.markdown("---")
+    st.subheader("2. Travel Purpose & Metadata")
+    
+    # Determine fields based on configurations
     active_registry = st.session_state.get("uploaded_files_registry", {})
     has_standard = any(meta["template_type"] == "standard" for meta in active_registry.values())
     
@@ -510,112 +534,169 @@ elif current_step == 3:
     else:
         show_program_code = (st.session_state.template_type == "standard")
     
-    # Safely define baseline variable defaults to prevent local NameErrors
     program_code = ""
     round_trip = "Yes"
 
-    # --- UI: DYNAMIC FORM FIELDS
-    if not show_program_code:
-        col_purpose, col_calc = st.columns([3, 1])
-        with col_purpose:
-            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
-    else: 
-        col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
-        with col_purpose:
-            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
-        with col_prog_code:
-            program_code = st.text_input(
-                "Program Code",
-                placeholder="e.g., 101",
-                key=f"journey_prog_code_{gen}"
-            )
-        with col_rt:
-            round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
+    metadata_container = st.container(border=True)
+    with metadata_container:
+        if not show_program_code:
+            col_purpose, col_calc = st.columns([3, 1])
+            with col_purpose:
+                purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}", placeholder="e.g., Client Visit / Site Audit")
+        else: 
+            col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
+            with col_purpose:
+                purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}", placeholder="e.g., Client Visit / Site Audit")
+            with col_prog_code:
+                program_code = st.text_input(
+                    "Program Code",
+                    placeholder="e.g., 101",
+                    key=f"journey_prog_code_{gen}"
+                )
+            with col_rt:
+                round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
-    # --- ODOMETER FIELDS
-    if st.session_state.template_type == "at_promise": 
-        st.markdown("##### Odometer Count (Probation Form ONLY) ") 
-        col_odo_start, col_odo_end = st.columns(2) 
+        # Dynamic Odometer Fields
+        if st.session_state.template_type == "at_promise": 
+            st.markdown("**Odometer Count** *(Required for Probation Form)*") 
+            col_odo_start, col_odo_end = st.columns(2) 
 
-        with col_odo_start:
-            odo_start_input = st.text_input( 
-                "Odometer Start",
-                placeholder="e.g., 45100",
-                key=f"journey_odo_start_{gen}"
-            ) 
-        with col_odo_end:
-            odo_end_input = st.text_input( 
-                "Odometer End",
-                placeholder="e.g., 45125",
-                key=f"journey_odo_end_{gen}" 
-            )
-    else:
-        odo_start_input = "" 
-        odo_end_input = ""
+            with col_odo_start:
+                odo_start_input = st.text_input( 
+                    "Odometer Start",
+                    placeholder="e.g., 45100",
+                    key=f"journey_odo_start_{gen}"
+                ) 
+            with col_odo_end:
+                odo_end_input = st.text_input( 
+                    "Odometer End",
+                    placeholder="e.g., 45125",
+                    key=f"journey_odo_end_{gen}" 
+                )
+        else:
+            odo_start_input = "" 
+            odo_end_input = ""
 
-    # BUTTON 1: CALCULATE & PREVIEW
-    calculate_button = st.button("Calculate & Preview Route 🗺️", type="secondary", key=f"journey_calc_btn_{gen}", use_container_width=True) 
+    # --- SECTION 3: CALCULATION, PREVIEW & SAVE ---
+    st.markdown("---")
+    
+    # Prominent Primary Action Button
+    calculate_button = st.button("Calculate & Preview Route 🗺️", type="primary", key=f"journey_calc_btn_{gen}", use_container_width=True) 
 
     if calculate_button: 
         if not start_loc or not dest_loc: 
             st.error("⚠️ Please provide both a Starting Location and Destination.") 
         else:
-            current_origin = start_loc 
-            google_miles = 0.0 
-            
-            for stop in additional_stops: 
-                google_miles += get_google_distance_miles(current_origin, stop) 
-                current_origin = stop 
+            with st.spinner("Calculating distances..."):
+                current_origin = start_loc 
+                google_miles = 0.0 
                 
-            google_miles += get_google_distance_miles(current_origin, dest_loc) 
-            calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles 
-            calculated_miles = round(calculated_miles, 1) 
+                for stop in additional_stops: 
+                    google_miles += get_google_distance_miles(current_origin, stop) 
+                    current_origin = stop 
+                    
+                google_miles += get_google_distance_miles(current_origin, dest_loc) 
+                calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles 
+                calculated_miles = round(calculated_miles, 1) 
 
-            if additional_stops: 
-                stops_str = " -> ".join(additional_stops) 
-                combined_destination = f"{stops_str} -> {dest_loc}" 
-            else:
-                combined_destination = dest_loc 
+                if additional_stops: 
+                    stops_str = " -> ".join(additional_stops) 
+                    combined_destination = f"{stops_str} -> {dest_loc}" 
+                else: 
+                    combined_destination = dest_loc 
+                    
+                if round_trip == "Yes": 
+                    combined_destination = f"{combined_destination} (RT)" 
+
+                def parse_to_float(val): 
+                    if not val or not str(val).strip():
+                        return None
+                    try:
+                        return round(float(val.strip()), 1) 
+                    except ValueError:
+                        return None 
+
+                o_start = parse_to_float(odo_start_input)
+                o_end = parse_to_float(odo_end_input)
                 
-            if round_trip == "Yes": 
-                combined_destination = f"{combined_destination} (RT)" 
+                if o_start is not None and o_end is None: 
+                    o_end = round(o_start + calculated_miles, 1) 
+                elif o_end is not None and o_start is None: 
+                    st_val = round(o_end - calculated_miles, 1)
+                    o_start = max(0.0, st_val)
+                elif o_start is not None and o_end is not None: 
+                    calculated_miles = round(o_end - o_start, 1) 
+                else:
+                    o_start, o_end = 0.0, round(calculated_miles, 1) 
 
-            def parse_to_float(val): 
-                if not val or not str(val).strip():
-                    return None
-                try:
-                    return round(float(val.strip()), 1) 
-                except ValueError:
-                    return None 
+                # Populate temporary preview details in state
+                st.session_state.temp_preview_trip = {
+                    "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date), 
+                    "Starting Location": start_loc, 
+                    "Destination": combined_destination, 
+                    "Round Trip": round_trip, 
+                    "Purpose of Travel": purpose, 
+                    "Odometer Start": o_start, 
+                    "Odometer End": o_end, 
+                    "Calculated Mileage": calculated_miles, 
+                    "Program Code": program_code, 
+                    "_source_file": "manual_entry" 
+                }
+                st.rerun()
 
-            o_start = parse_to_float(odo_start_input)
-            o_end = parse_to_float(odo_end_input)
+    # --- DYNAMIC PREVIEW SUMMARY CARD ---
+    # Shows up right away if st.session_state.temp_preview_trip contains computed distance details
+    if st.session_state.temp_preview_trip is not None:
+        trip = st.session_state.temp_preview_trip
+        
+        st.subheader("🔍 Calculated Route Review")
+        
+        # Design a distinct and beautiful review summary card
+        preview_card = st.container(border=True)
+        with preview_card:
+            col_left, col_right = st.columns([2, 1])
             
-            if o_start is not None and o_end is None: 
-                o_end = round(o_start + calculated_miles, 1) 
-            elif o_end is not None and o_start is None: 
-                st_val = round(o_end - calculated_miles, 1)
-                o_start = max(0.0, st_val)
-            elif o_start is not None and o_end is not None: 
-                calculated_miles = round(o_end - o_start, 1) 
-            else:
-                o_start, o_end = 0.0, round(calculated_miles, 1) 
+            with col_left:
+                st.markdown(f"🗓️ **Date:** `{trip['Date']}`")
+                st.markdown(f"🛫 **Starting From:** {trip['Starting Location']}")
+                st.markdown(f"🏁 **Ending At:** {trip['Destination']}")
+                if trip['Purpose of Travel']:
+                    st.markdown(f"💼 **Purpose:** *{trip['Purpose of Travel']}*")
+                if trip['Program Code']:
+                    st.markdown(f"🏷️ **Program Code:** `{trip['Program Code']}`")
+                
+                # Dynamic Odometer feedback message inside the card
+                if st.session_state.template_type == "at_promise":
+                    st.info(f"📊 **Odometer Calculation:** {trip['Odometer Start']} ➔ {trip['Odometer End']}")
 
-            st.session_state.temp_preview_trip = {
-                "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date), 
-                "Starting Location": start_loc, 
-                "Destination": combined_destination, 
-                "Round Trip": round_trip, 
-                "Purpose of Travel": purpose, 
-                "Odometer Start": o_start, 
-                "Odometer End": o_end, 
-                "Calculated Mileage": calculated_miles, 
-                "Program Code": program_code, 
-                "_source_file": "manual_entry" 
-            }
-            st.rerun()
-
-    st.markdown("---")
+            with col_right:
+                # Big bold summary KPI Callout
+                st.markdown("<p style='text-align: center; margin-bottom: 0px;'>Distance Calculated</p>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin-top: 0px;'>{trip['Calculated Mileage']} <span style='font-size: 18px;'>mi</span></h1>", unsafe_allow_html=True)
+                
+                # Form Action confirmations
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    save_btn = st.button("Confirm & Log", type="primary", use_container_width=True)
+                with col_cancel:
+                    cancel_btn = st.button("Cancel", type="secondary", use_container_width=True)
+                    
+                if save_btn:
+                    # Append temp details straight into mileage_data
+                    st.session_state.mileage_data = pd.concat(
+                        [st.session_state.mileage_data, pd.DataFrame([trip])],
+                        ignore_index=True
+                    )
+                    st.session_state.temp_preview_trip = None
+                    st.session_state.form_generation += 1
+                    st.session_state.num_stops = 0
+                    st.success("🎉 Trip added to mileage logs successfully!")
+                    st.rerun()
+                    
+                if cancel_btn:
+                    st.session_state.temp_preview_trip = None
+                    st.rerun()
+                    
 
     # Map details and print view for the calculated draft route
     if st.session_state.temp_preview_trip is not None: 
