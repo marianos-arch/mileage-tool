@@ -207,7 +207,6 @@ if "current_step" not in st.session_state:
 # --- HELPER FUNCTION TO NAVIGATE
 def go_to_step(step_number):
     st.session_state.current_step = step_number
-    st.rerun()
 
 # --- STEP PROGRESS INDICATOR
 steps = {
