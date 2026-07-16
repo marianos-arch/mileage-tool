@@ -200,14 +200,32 @@ init_session_state() # [cite: 24]
 st.title("GP Mileage Tracker 🚗")
 st.markdown("Easily calculate journeys, build route maps, and sync back to your formatted GP templates.")
 
-# --- THE WIZARD TABS
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📂 1. Upload Base Template",
-    "📝 2. Cover Sheet Setup",
-    "📍 3. Log Trips & Review Maps",
-    "📥 4. View Log & Export"
-])
+# --- INITIALIZE STEP IN SESSION STATE
+if "current_step" not in st.session_state:
+    st.session_state.current_step = 1
 
+# --- HELPER FUNCTION TO NAVIGATE
+def go_to_step(step_number):
+    st.session_state.current_step = step_number
+    st.rerun()
+
+# --- STEP PROGRESS INDICATOR
+steps = {
+    1: "📂 1. Upload Template",
+    2: "📝 2. Cover Sheet",
+    3: "📍 3. Log Journey",
+    4: "📥 4. Review & Export"
+}
+
+cols = st.columns(len(steps))
+for i, (step_num, step_name) in enumerate(steps.items(), 1):
+    with cols[i-1]:
+        if st.session_state.current_step == step_num:
+            st.markdown(f"**🔵 {step_name}**")  # Active Step
+        else:
+            st.markdown(f"<span style='color: gray;'>⚪ {step_name}</span>", unsafe_allow_html=True)
+
+st.markdown("---")
 # ==========================================
 # STEP 1: FILE UPLOAD & INGESTION
 # ==========================================
