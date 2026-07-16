@@ -226,11 +226,17 @@ for i, (step_num, step_name) in enumerate(steps.items(), 1):
             st.markdown(f"<span style='color: gray;'>⚪ {step_name}</span>", unsafe_allow_html=True)
 
 st.markdown("---")
+current_step = st.session_state.current_step
+
+# Initialize a temporary state to hold the "calculated but uncommitted" preview trip
+if "temp_preview_trip" not in st.session_state:
+    st.session_state.temp_preview_trip = None
 # ==========================================
 # STEP 1: FILE UPLOAD & INGESTION
 # ==========================================
-with tab1:
-    st.header("Upload Mileage Excel Sheet") # [cite: 24]
+
+if current_step == 1:
+    st.header("Upload Mileage Excel Sheet")
     uploaded_templates = st.file_uploader(
         "Upload your mileage excel sheet (.xlsx)", # [cite: 24, 25]
         type=["xlsx"], 
@@ -302,10 +308,15 @@ with tab1:
         if state_updated: # [cite: 35]
             st.rerun() # [cite: 35]
 
+            # --- DYNAMIC "NEXT" BUTTON
+        if len(st.session_state.uploaded_files_registry) > 0:
+            st.success("🎉 Base template(s) loaded successfully!")
+            st.button("Continue to Cover Sheet Setup ➡️", on_click=go_to_step, args=(2,), use_container_width=True)
+
 # ==========================================
 # STEP 2: COVER SHEET METADATA
 # ==========================================
-with tab2:
+elif current_step == 2:
     st.header("Cover Sheet Information") # [cite: 35]
     col1, col2, col3 = st.columns([2, 2, 1]) # [cite: 35]
 
@@ -399,10 +410,21 @@ with tab2:
         else:
             st.session_state.rate_per_mile = DEFAULT_RATE_PER_MILE # [cite: 46]
 
+    # --- NAVIGATION BUTTONS
+    col_back, col_next = st.columns(2)
+    with col_back:
+        st.button("⬅️ Back to Upload", on_click=go_to_step, args=(1,), use_container_width=True)
+    with col_next:
+        # Show "Next" button only if they have filled in their name
+        if st.session_state.employee_name:
+            st.button("Continue to Journey Logger ➡️", on_click=go_to_step, args=(3,), use_container_width=True)
+        else:
+            st.warning("⚠️ Please enter your Employee Name to proceed.")
+
 # ==========================================
 # STEP 3: LOG NEW TRIPS & VIEW MAP ROUTES
 # ==========================================
-with tab3:
+elif current_step == 3:
     st.header("Track Your Journey")
 
     # Add Journey Entry Form # [cite: 46]
@@ -718,8 +740,8 @@ with tab3:
 # ==========================================
 # STEP 4: MILEAGE LOG TABLE & EXPORT BACK TO EXCEL
 # ==========================================
-with tab4:
-    st.header("Review & Export") # [cite: 84]
+elif current_step == 4:
+    st.header("Review & Export")
 
     if not st.session_state.mileage_data.empty: # [cite: 84]
         # Running tally section for reassurance
@@ -872,3 +894,8 @@ with tab4:
                         st.error(f"Failed to append records to target workbook {filename}: {e}") # [cite: 110, 111]
     else:
         st.info("Upload excel sheets in Step 1 to enable spreadsheet exports.") # [cite: 111]
+
+    # --- NAVIGATION BUTTON
+    st.markdown("---")
+    st.button("⬅️ Back to Logger", on_click=go_to_step, args=(3,), use_container_width=True)
+
