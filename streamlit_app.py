@@ -502,27 +502,43 @@ elif current_step == 3:
             if st.button("▬ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0: 
                 st.session_state.num_stops -= 1 
                 st.rerun() 
-
-    if st.session_state.template_type == "at_promise": 
-        col_purpose, col_calc = st.columns([3, 1]) 
-        form_prog_code = "" 
+                
+    # --- DETERMINE FIELD VISIBILITY BASED ON ALL UPLOADED FILES
+    active_registry = st.session_state.get("uploaded_files_registry", {})
+    has_standard = any(meta["template_type"] == "standard" for meta in active_registry.values())
+    
+    if active_registry:
+        # If templates are uploaded, show the program code if at least one standard template is active
+        show_program_code = has_standard
+    else:
+        # Fallback default if no files are uploaded yet
+        show_program_code = (st.session_state.template_type == "standard")
+    
+    # --- UI: DYNAMIC FORM FIELDS
+    if not show_program_code:
+        # --- "At-Promise" ONLY Mode: Hide program code
+        col_purpose, col_calc = st.columns([3, 1])
+        program_code = ""  # Fixed: defined as empty string to prevent NameError later
+        round_trip = "Yes" # Default fallback for at-promise calculations
+        
         with col_purpose:
             purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
     else: 
-        col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1]) 
+        # --- Standard Mode (Standard ONLY or Mixed Templates): Show program code
+        col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1])
         
         with col_purpose:
-            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}") 
+            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
         
         with col_prog_code:
-            program_code = st.text_input( 
-                "Program Code", 
+            program_code = st.text_input(
+                "Program Code",
                 placeholder="e.g., 101",
                 key=f"journey_prog_code_{gen}"
-            ) 
+            )
         
         with col_rt:
-            round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}") 
+            round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}")
 
     if st.session_state.template_type == "at_promise": 
         st.markdown("##### Odometer Count (Probation Form ONLY) ") 
