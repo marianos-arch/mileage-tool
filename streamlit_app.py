@@ -770,14 +770,14 @@ elif current_step == 3:
 elif current_step == 4:
     st.header("Review & Export")
 
-    if not st.session_state.mileage_data.empty: # [cite: 84]
+    if not st.session_state.mileage_data.empty:
         # Running tally section for reassurance
-        total_miles = st.session_state.mileage_data["Calculated Mileage"].sum() # [cite: 84]
+        total_miles = st.session_state.mileage_data["Calculated Mileage"].sum()
         reimbursement_amt = total_miles * st.session_state.rate_per_mile
         
         col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
         with col_m1:
-            st.metric("Total Period Mileage", f"{total_miles:.1f} miles") # [cite: 84]
+            st.metric("Total Period Mileage (All Entries)", f"{total_miles:.1f} miles")
         with col_m2:
             st.metric("Reimbursement Rate", f"${st.session_state.rate_per_mile:.3f} / mi")
         with col_m3:
@@ -785,142 +785,182 @@ elif current_step == 4:
 
         st.markdown("---")
         st.subheader("Edit/Verify Logs")
-        st.caption("**Tip:** Double-click any calculated mileage cell to make manual corrections directly in the sheet table below.") # [cite: 84]
+        st.caption("**Tip:** Double-click any calculated mileage cell to make manual corrections directly in the sheet tables below.")
 
-        if st.session_state.template_type == "at_promise": # [cite: 84]
-            display_columns = [col for col in MILEAGE_COLUMNS if col != "Program Code"] # [cite: 85]
-            column_configuration = {
-                "Calculated Mileage": st.column_config.NumberColumn(
-                    "Calculated Mileage",
-                    help="Double-click to override with manual app miles if needed.",
-                    format="%.1f",
-                    min_value=0.0, # [cite: 85, 86]
-                    required=True
-                )
-            }
-        else:
-            display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]] # [cite: 86]
-            column_configuration = {
-                "Calculated Mileage": st.column_config.NumberColumn(
-                    "Calculated Mileage", # [cite: 86, 87]
-                    help="Double-click to override with manual app miles if needed.",
-                    format="%.1f",
-                    min_value=0.0,
-                    required=True
-                )
-            } # [cite: 88]
-        
-        edited_df = st.data_editor( # [cite: 88]
-            st.session_state.mileage_data,
-            column_order=display_columns, 
-            num_rows="dynamic",
-            use_container_width=True,
-            key="mileage_editor",
-            column_config=column_configuration
-        )
+        # If templates are uploaded, split them into separate tabs
+        if st.session_state.uploaded_files_registry:
+            workbook_names = list(st.session_state.uploaded_files_registry.keys())
+            tabs = st.tabs([f"📋 {name}" for name in workbook_names])
 
-        if not edited_df.equals(st.session_state.mileage_data): # [cite: 88]
-            for idx in edited_df.index: # [cite: 88]
-                if idx in st.session_state.mileage_data.index: # [cite: 88, 89]
-                    old_mileage = st.session_state.mileage_data.loc[idx, "Calculated Mileage"] # [cite: 89]
-                    new_mileage = edited_df.loc[idx, "Calculated Mileage"] # [cite: 89]
+            for idx, filename in enumerate(workbook_names):
+                with tabs[idx]:
+                    meta = st.session_state.uploaded_files_registry[filename]
+                    is_probation = (meta["template_type"] == "at_promise")
+
+                    # Filter: Show this workbook's imported rows OR any manually added entries
+                    file_subset = st.session_state.mileage_data[
+                        (st.session_state.mileage_data["_source_file"] == filename) |
+                        (st.session_state.mileage_data["_source_file"] == "manual_entry")
+                    ]
+
+                    if file_subset.empty:
+                        st.info("No logs generated or imported for this workbook yet.")
+                        continue
+
+                    # Set up columns based on the specific template type of this tab
+                    if is_probation:
+                        display_columns = [col for col in MILEAGE_COLUMNS if col != "Program Code"]
+                        column_configuration = {
+                            "Calculated Mileage": st.column_config.NumberColumn(
+                                "Calculated Mileage",
+                                help="Double-click to override with manual app miles if needed.",
+                                format="%.1f",
+                                min_value=0.0,
+                                required=True
+                            )
+                        }
+                    else:
+                        display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
+                        column_configuration = {
+                            "Calculated Mileage": st.column_config.NumberColumn(
+                                "Calculated Mileage",
+                                help="Double-click to override with manual app miles if needed.",
+                                format="%.1f",
+                                min_value=0.0,
+                                required=True
+                            )
+                        }
+
+                    # Render the interactive data editor for this specific workbook tab
+                    edited_subset = st.data_editor(
+                        file_subset,
+                        column_order=display_columns, 
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"mileage_editor_{filename}",
+                        column_config=column_configuration
+                    )
                     
-                    if old_mileage != new_mileage: # [cite: 89]
-                        odo_start = float(edited_df.loc[idx, "Odometer Start"] or 0.0) # [cite: 89, 90]
-                        odo_end = float(edited_df.loc[idx, "Odometer End"] or 0.0) # [cite: 90]
+                    # Check for edits and sync them back to the main session DataFrame
+                    if not edited_subset.equals(file_subset):
+                        for sub_idx in edited_subset.index:
+                            if sub_idx in st.session_state.mileage_data.index:
+                                old_mileage = st.session_state.mileage_data.loc[sub_idx, "Calculated Mileage"]
+                                new_mileage = edited_subset.loc[sub_idx, "Calculated Mileage"]
+                                
+                                if old_mileage != new_mileage:
+                                    # Convert odometer targets to floats
+                                    odo_start = float(edited_subset.loc[sub_idx, "Odometer Start"] or 0.0)
+                                    odo_end = float(edited_subset.loc[sub_idx, "Odometer End"] or 0.0)
+                                    
+                                    start_has_decimal = "." in str(odo_start) and not str(odo_start).endswith(".0")
+                                    end_has_decimal = "." in str(odo_end) and not str(odo_end).endswith(".0")
+                                    
+                                    if start_has_decimal and not end_has_decimal:
+                                        edited_subset.loc[sub_idx, "Odometer End"] = round(odo_start + new_mileage, 1)
+                                    elif end_has_decimal and not start_has_decimal:
+                                        edited_subset.loc[sub_idx, "Odometer Start"] = round(max(0.0, odo_end - new_mileage), 1)
+                                    else:
+                                        edited_subset.loc[sub_idx, "Odometer End"] = round(odo_start + new_mileage, 1)
                         
-                        start_has_decimal = "." in str(odo_start) and not str(odo_start).endswith(".0") # [cite: 90, 91]
-                        end_has_decimal = "." in str(odo_end) and not str(odo_end).endswith(".0") # [cite: 91]
-                        
-                        if start_has_decimal and not end_has_decimal: # [cite: 91]
-                            edited_df.loc[idx, "Odometer End"] = round(odo_start + new_mileage, 1) # [cite: 91, 92]
-                        elif end_has_decimal and not start_has_decimal: # [cite: 92]
-                            edited_df.loc[idx, "Odometer Start"] = round(max(0.0, odo_end - new_mileage), 1) # [cite: 92, 93]
-                        else:
-                            edited_df.loc[idx, "Odometer End"] = round(odo_start + new_mileage, 1) # [cite: 93, 94]
-                            
-            st.session_state.mileage_data = edited_df # [cite: 94]
-            st.rerun() # [cite: 94]
+                        # Update the global state with the edited subset using the matched index
+                        st.session_state.mileage_data.update(edited_subset)
+                        st.rerun()
+        else:
+            # Fallback if no files are uploaded yet (just display a clean default editor)
+            st.info("Upload Excel templates in Step 1 to organize logs into workbook tabs.")
+            display_columns = [col for col in MILEAGE_COLUMNS if col not in ["Odometer Start", "Odometer End"]]
+            
+            edited_df = st.data_editor(
+                st.session_state.mileage_data,
+                column_order=display_columns, 
+                num_rows="dynamic",
+                use_container_width=True,
+                key="mileage_editor_fallback"
+            )
+            if not edited_df.equals(st.session_state.mileage_data):
+                st.session_state.mileage_data = edited_df
+                st.rerun()
     else:
-        st.info("No mileage entries added yet. Go back to Step 3 or upload a template in Step 1 to get started.") # [cite: 94, 95]
+        st.info("No mileage entries added yet. Go back to Step 3 or upload a template in Step 1 to get started.")
 
     st.markdown("---")
 
-    # Excel Exporter Section # [cite: 95]
-    if st.session_state.uploaded_files_registry: # [cite: 95]
-        st.subheader("Export Back to Excel Templates") # [cite: 95]
-        st.markdown("This will dynamically append only new manual entries into your clean target workbook files while retaining original styling layouts.") # [cite: 95]
+    # Excel Exporter Section
+    if st.session_state.uploaded_files_registry:
+        st.subheader("Export Back to Excel Templates")
+        st.markdown("This will dynamically append only new manual entries into your clean target workbook files while retaining original styling layouts.")
         
-        if "_source_file" in st.session_state.mileage_data.columns: # [cite: 95]
-            new_session_rows = st.session_state.mileage_data[ # [cite: 95]
-                st.session_state.mileage_data["_source_file"] == "manual_entry" # [cite: 95]
+        if "_source_file" in st.session_state.mileage_data.columns:
+            new_session_rows = st.session_state.mileage_data[
+                st.session_state.mileage_data["_source_file"] == "manual_entry"
             ]
         else:
-            new_session_rows = st.session_state.mileage_data[ # [cite: 95, 96]
-                ~st.session_state.mileage_data["Starting Location"].str.contains(IMPORT_MARKER, na=False) # [cite: 96]
+            new_session_rows = st.session_state.mileage_data[
+                ~st.session_state.mileage_data["Starting Location"].str.contains(IMPORT_MARKER, na=False)
             ]
         
-        for filename, meta in st.session_state.uploaded_files_registry.items(): # [cite: 96]
-            is_probation = (meta["template_type"] == "at_promise") # [cite: 96]
-            template_display = "AT-PROMISE (Probation)" if is_probation else "Standard (GP)" # [cite: 96, 97]
-            form_label = "Probation" if is_probation else "GP" # [cite: 97]
+        for filename, meta in st.session_state.uploaded_files_registry.items():
+            is_probation = (meta["template_type"] == "at_promise")
+            template_display = "AT-PROMISE (Probation)" if is_probation else "Standard (GP)"
+            form_label = "Probation" if is_probation else "GP"
             
-            with st.expander(f"📥 Download Config: {filename} ({template_display})", expanded=True): # [cite: 97]
-                if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"): # [cite: 97]
+            with st.expander(f"📥 Download Config: {filename} ({template_display})", expanded=True):
+                if st.button(f"Generate Updated File for {filename}", key=f"gen_btn_{filename}"):
                     try:
-                        output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"])) # [cite: 97, 98]
-                        s1 = output_wb.worksheets[0] # [cite: 98]
+                        output_wb = openpyxl.load_workbook(BytesIO(meta["bytes"]))
+                        s1 = output_wb.worksheets[0]
                         
-                        if is_probation: # [cite: 98]
-                            s1["C3"] = st.session_state.employee_name # [cite: 98, 99]
-                            s1["E4"] = st.session_state.date_range_str # [cite: 99]
-                            s1["E3"] = st.session_state.rate_per_mile # [cite: 99]
+                        if is_probation:
+                            s1["C3"] = st.session_state.employee_name
+                            s1["E4"] = st.session_state.date_range_str
+                            s1["E3"] = st.session_state.rate_per_mile
                             
-                            current_write_row = 9 + meta["imported_count"] # [cite: 99, 100]
-                            for _, row in new_session_rows.iterrows(): # [cite: 100]
-                                s1[f"B{current_write_row}"] = row["Date"] # [cite: 100]
-                                s1[f"C{current_write_row}"] = row["Starting Location"] # [cite: 100, 101]
-                                s1[f"D{current_write_row}"] = row["Destination"] # [cite: 101]
-                                s1[f"E{current_write_row}"] = row["Purpose of Travel"] # [cite: 101]
-                                s1[f"F{current_write_row}"] = row["Odometer Start"] # [cite: 101]
-                                s1[f"G{current_write_row}"] = row["Odometer End"] # [cite: 101, 102]
-                                current_write_row += 1 # [cite: 102]
+                            current_write_row = 9 + meta["imported_count"]
+                            for _, row in new_session_rows.iterrows():
+                                s1[f"B{current_write_row}"] = row["Date"]
+                                s1[f"C{current_write_row}"] = row["Starting Location"]
+                                s1[f"D{current_write_row}"] = row["Destination"]
+                                s1[f"E{current_write_row}"] = row["Purpose of Travel"]
+                                s1[f"F{current_write_row}"] = row["Odometer Start"]
+                                s1[f"G{current_write_row}"] = row["Odometer End"]
+                                current_write_row += 1
                         else:
-                            s1["D11"] = st.session_state.employee_name # [cite: 102, 103]
-                            s1["D15"] = st.session_state.date_range_str # [cite: 103]
+                            s1["D11"] = st.session_state.employee_name
+                            s1["D15"] = st.session_state.date_range_str
 
-                            if len(output_wb.worksheets) >= 3: # [cite: 103]
-                                s3 = output_wb.worksheets[2] # [cite: 103]
-                                current_write_row = 5 # [cite: 103, 104]
-                                while s3[f"B{current_write_row}"].value: # [cite: 104]
-                                    current_write_row += 1 # [cite: 104]
+                            if len(output_wb.worksheets) >= 3:
+                                s3 = output_wb.worksheets[2]
+                                current_write_row = 5
+                                while s3[f"B{current_write_row}"].value:
+                                    current_write_row += 1
                                 
-                                for _, row in new_session_rows.iterrows(): # [cite: 104, 105]
-                                    s3[f"B{current_write_row}"] = row["Date"] # [cite: 105]
-                                    s3[f"C{current_write_row}"] = row["Destination"] # [cite: 105, 106]
-                                    s3[f"D{current_write_row}"] = row.get("Program Code", "") # [cite: 106]
-                                    s3[f"E{current_write_row}"] = row["Purpose of Travel"] # [cite: 106]
-                                    s3[f"F{current_write_row}"] = row["Calculated Mileage"] # [cite: 106, 107]
-                                    current_write_row += 1 # [cite: 107]
+                                for _, row in new_session_rows.iterrows():
+                                    s3[f"B{current_write_row}"] = row["Date"]
+                                    s3[f"C{current_write_row}"] = row["Destination"]
+                                    s3[f"D{current_write_row}"] = row.get("Program Code", "")
+                                    s3[f"E{current_write_row}"] = row["Purpose of Travel"]
+                                    s3[f"F{current_write_row}"] = row["Calculated Mileage"]
+                                    current_write_row += 1
                         
-                        excel_stream = BytesIO() # [cite: 107]
-                        output_wb.save(excel_stream) # [cite: 107, 108]
-                        excel_stream.seek(0) # [cite: 108]
+                        excel_stream = BytesIO()
+                        output_wb.save(excel_stream)
+                        excel_stream.seek(0)
                         
-                        today_str = datetime.date.today().strftime("%Y-%m-%d") # [cite: 108]
+                        today_str = datetime.date.today().strftime("%Y-%m-%d")
 
-                        st.download_button( # [cite: 108]
-                            label=f"📥 Download Updated {filename}", # [cite: 108, 109]
-                            data=excel_stream, # [cite: 109]
-                            file_name=f"{form_label}_Mileage_{today_str}.xlsx", # [cite: 109]
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", # [cite: 109]
-                            key=f"dl_btn_{filename}", # [cite: 109, 110]
-                            use_container_width=True # [cite: 110]
+                        st.download_button(
+                            label=f"📥 Download Updated {filename}",
+                            data=excel_stream,
+                            file_name=f"{form_label}_Mileage_{today_str}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"dl_btn_{filename}",
+                            use_container_width=True
                         )
-                    except Exception as e: # [cite: 110]
-                        st.error(f"Failed to append records to target workbook {filename}: {e}") # [cite: 110, 111]
+                    except Exception as e:
+                        st.error(f"Failed to append records to target workbook {filename}: {e}")
     else:
-        st.info("Upload excel sheets in Step 1 to enable spreadsheet exports.") # [cite: 111]
+        st.info("Upload excel sheets in Step 1 to enable spreadsheet exports.")
 
     # --- NAVIGATION BUTTON
     st.markdown("---")
