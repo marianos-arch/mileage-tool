@@ -424,319 +424,334 @@ elif current_step == 2:
 # ==========================================
 # STEP 3: LOG NEW TRIPS & VIEW MAP ROUTES
 # ==========================================
+
 elif current_step == 3:
     st.header("Track Your Journey")
 
-    # Add Journey Entry Form # [cite: 46]
-    if "form_generation" not in st.session_state:
-        st.session_state.form_generation = 0 # [cite: 46]
+    # Ensure a session state key exists for holding our unsubmitted "draft" trip
+    if "temp_preview_trip" not in st.session_state:
+        st.session_state.temp_preview_trip = None
 
-    gen = st.session_state.form_generation # [cite: 46]
-    today = datetime.date.today() # [cite: 46, 47]
-    col_date, col_start, col_dest = st.columns(3) # [cite: 47]
+    # Add Journey Entry Form 
+    if "form_generation" not in st.session_state:
+        st.session_state.form_generation = 0 
+
+    gen = st.session_state.form_generation 
+    today = datetime.date.today() 
+    col_date, col_start, col_dest = st.columns(3) 
 
     with col_date:
-        travel_date = st.date_input("Date", value=today, key=f"journey_travel_date_{gen}") # [cite: 47]
+        travel_date = st.date_input("Date", value=today, key=f"journey_travel_date_{gen}") 
 
     with col_start:
-        st.write("**Starting Location**") # [cite: 47]
-        selected_shortcut = st.selectbox( # [cite: 47]
+        st.write("**Starting Location**") 
+        selected_shortcut = st.selectbox( 
             "Quick Select Location",
             options=list(COMMON_LOCATIONS.keys()),
             key=f"start_shortcut_{gen}",
             label_visibility="collapsed"
-        ) # [cite: 47]
+        ) 
         
-        if selected_shortcut == "Custom / Type Address...": # [cite: 47]
-            start_loc = st_searchbox( # [cite: 47]
-                search_google_places, # [cite: 47, 48]
+        if selected_shortcut == "Custom / Type Address...": 
+            start_loc = st_searchbox( 
+                search_google_places, 
                 key=f"start_location_search_{gen}",
                 placeholder="Type custom starting address..."
-            ) # [cite: 48]
+            ) 
         else:
-            start_loc = COMMON_LOCATIONS[selected_shortcut] # [cite: 48]
-            st.info(f"**Using:** {start_loc}") # [cite: 48]
+            start_loc = COMMON_LOCATIONS[selected_shortcut] 
+            st.info(f"**Using:** {start_loc}") 
 
     if "num_stops" not in st.session_state:
-        st.session_state.num_stops = 0 # [cite: 48]
+        st.session_state.num_stops = 0 
 
     with col_dest:
-        st.write("**Final Destination**") # [cite: 48]
-        selected_dest_shortcut = st.selectbox( # [cite: 48]
+        st.write("**Final Destination**") 
+        selected_dest_shortcut = st.selectbox( 
             "Quick Select Destination",
-            options=list(COMMON_LOCATIONS.keys()), # [cite: 48]
-            key=f"dest_shortcut_{gen}", # [cite: 48, 49]
+            options=list(COMMON_LOCATIONS.keys()), 
+            key=f"dest_shortcut_{gen}", 
             label_visibility="collapsed"
-        ) # [cite: 49]
+        ) 
 
-        if selected_dest_shortcut == "Custom / Type Address...": # [cite: 49]
-            dest_loc = st_searchbox( # [cite: 49]
+        if selected_dest_shortcut == "Custom / Type Address...": 
+            dest_loc = st_searchbox( 
                 search_google_places,
                 key=f"destination_search_{gen}",
                 placeholder="Type final destination address..."
-            ) # [cite: 49]
+            ) 
         else:
-            dest_loc = COMMON_LOCATIONS[selected_dest_shortcut] # [cite: 49, 50]
-            st.info(f"**Using:** {dest_loc}") # [cite: 50]
+            dest_loc = COMMON_LOCATIONS[selected_dest_shortcut] 
+            st.info(f"**Using:** {dest_loc}") 
             
-        additional_stops = [] # [cite: 50]
-        for i in range(st.session_state.num_stops): # [cite: 50]
-            stop = st_searchbox( # [cite: 50]
+        additional_stops = [] 
+        for i in range(st.session_state.num_stops): 
+            stop = st_searchbox( 
                 search_google_places,
                 key=f"stop_search_{i}_{gen}",
                 placeholder=f"Type stop address #{i+1}..."
-            ) # [cite: 50]
-            if stop: # [cite: 50]
-                additional_stops.append(stop) # [cite: 51]
+            ) 
+            if stop: 
+                additional_stops.append(stop) 
                 
-        c_add, c_rem = st.columns(2) # [cite: 51]
+        c_add, c_rem = st.columns(2) 
         with c_add:
-            if st.button("✚ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True): # [cite: 51]
-                st.session_state.num_stops += 1 # [cite: 51]
-                st.rerun() # [cite: 51]
+            if st.button("✚ Add Stop", key=f"add_stop_btn_{gen}", use_container_width=True): 
+                st.session_state.num_stops += 1 
+                st.rerun() 
         with c_rem:
-            if st.button("▬ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0: # [cite: 51, 52]
-                st.session_state.num_stops -= 1 # [cite: 52]
-                st.rerun() # [cite: 52]
+            if st.button("▬ Remove Stop", key=f"rem_stop_btn_{gen}", use_container_width=True) and st.session_state.num_stops > 0: 
+                st.session_state.num_stops -= 1 
+                st.rerun() 
 
-    if st.session_state.template_type == "at_promise": # [cite: 52]
-        col_purpose, col_calc = st.columns([3, 1]) # [cite: 52]
-        form_prog_code = "" # [cite: 52]
+    if st.session_state.template_type == "at_promise": 
+        col_purpose, col_calc = st.columns([3, 1]) 
+        form_prog_code = "" 
+        with col_purpose:
+            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}")
     else: 
-        col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1]) # [cite: 52]
+        col_purpose, col_prog_code, col_rt = st.columns([2, 1, 1]) 
         
         with col_purpose:
-            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}") # [cite: 52]
+            purpose = st.text_input("Purpose of Travel", key=f"journey_purpose_{gen}") 
         
         with col_prog_code:
-            program_code = st.text_input( # [cite: 52]
-                "Program Code", # [cite: 52, 53]
+            program_code = st.text_input( 
+                "Program Code", 
                 placeholder="e.g., 101",
                 key=f"journey_prog_code_{gen}"
-            ) # [cite: 53]
+            ) 
         
         with col_rt:
-            round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}") # [cite: 53]
+            round_trip = st.selectbox("Round Trip?", ["Yes", "No"], key=f"journey_round_trip_{gen}") 
 
-    if st.session_state.template_type == "at_promise": # [cite: 53]
-        st.markdown("##### Odometer Count (Probation Form ONLY) ") # [cite: 53]
-        col_odo_start, col_odo_end = st.columns(2) # [cite: 53]
+    if st.session_state.template_type == "at_promise": 
+        st.markdown("##### Odometer Count (Probation Form ONLY) ") 
+        col_odo_start, col_odo_end = st.columns(2) 
 
         with col_odo_start:
-            odo_start_input = st.text_input( # [cite: 53, 54]
+            odo_start_input = st.text_input( 
                 "Odometer Start",
                 placeholder="e.g., 45100",
                 key=f"journey_odo_start_{gen}"
-            ) # [cite: 54]
+            ) 
 
         with col_odo_end:
-            odo_end_input = st.text_input( # [cite: 54]
+            odo_end_input = st.text_input( 
                 "Odometer End",
                 placeholder="e.g., 45125",
-                key=f"journey_odo_end_{gen}" # [cite: 54, 55]
+                key=f"journey_odo_end_{gen}" 
             )
     else:
-        odo_start_input = "" # [cite: 55]
-        odo_end_input = "" # [cite: 55]
+        odo_start_input = "" 
+        odo_end_input = ""
+        round_trip = "Yes" if 'round_trip' not in locals() else round_trip
+        program_code = "" if 'program_code' not in locals() else program_code
 
-    submit_button = st.button("Calculate & Add Entry", type="primary", key=f"journey_submit_btn_{gen}", use_container_width=True) # [cite: 55]
+    # BUTTON 1: CALCULATE & PREVIEW (Changes from original Add Entry button)
+    calculate_button = st.button("Calculate & Preview Route 🗺️", type="secondary", key=f"journey_calc_btn_{gen}", use_container_width=True) 
 
-    if submit_button: # [cite: 55]
-        if not start_loc or not dest_loc: # [cite: 55]
-            st.error("⚠️ Please provide both a Starting Location and Destination.") # [cite: 55]
+    if calculate_button: 
+        if not start_loc or not dest_loc: 
+            st.error("⚠️ Please provide both a Starting Location and Destination.") 
         else:
-            current_origin = start_loc # [cite: 55]
-            google_miles = 0.0 # [cite: 55]
+            current_origin = start_loc 
+            google_miles = 0.0 
             
-            for stop in additional_stops: # [cite: 55]
-                google_miles += get_google_distance_miles(current_origin, stop) # [cite: 56]
-                current_origin = stop # [cite: 56]
+            for stop in additional_stops: 
+                google_miles += get_google_distance_miles(current_origin, stop) 
+                current_origin = stop 
                 
-            google_miles += get_google_distance_miles(current_origin, dest_loc) # [cite: 56]
-            calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles # [cite: 56]
-            calculated_miles = round(calculated_miles, 1) # [cite: 56]
+            google_miles += get_google_distance_miles(current_origin, dest_loc) 
+            calculated_miles = google_miles * 2 if round_trip == "Yes" else google_miles 
+            calculated_miles = round(calculated_miles, 1) 
 
-            if additional_stops: # [cite: 56]
-                stops_str = " -> ".join(additional_stops) # [cite: 56, 57]
-                combined_destination = f"{stops_str} -> {dest_loc}" # [cite: 57]
+            if additional_stops: 
+                stops_str = " -> ".join(additional_stops) 
+                combined_destination = f"{stops_str} -> {dest_loc}" 
             else:
-                combined_destination = dest_loc # [cite: 57]
+                combined_destination = dest_loc 
                 
-            if round_trip == "Yes": # [cite: 57]
-                combined_destination = f"{combined_destination} (RT)" # [cite: 57]
+            if round_trip == "Yes": 
+                combined_destination = f"{combined_destination} (RT)" 
 
-            def parse_to_float(val): # [cite: 57]
+            def parse_to_float(val): 
                 try:
-                    return round(float(val.strip()), 1) # [cite: 57, 58]
+                    return round(float(val.strip()), 1) 
                 except ValueError:
-                    return None # [cite: 58]
+                    return None 
 
-            o_start = parse_to_float(odo_start_input) if odo_start_input.strip() else None # [cite: 58]
-            o_end = parse_to_float(odo_end_input) if odo_end_input.strip() else None # [cite: 58]
+            o_start = parse_to_float(odo_start_input) if odo_start_input.strip() else None 
+            o_end = parse_to_float(odo_end_input) if odo_end_input.strip() else None 
             
-            if o_start is not None and o_end is None: # [cite: 58]
-                o_end = round(o_start + calculated_miles, 1) # [cite: 59]
-            elif o_end is not None and o_start is None: # [cite: 59]
-                o_start = round(o_end - calculated_miles, 1) # [cite: 59]
-            elif o_start is not None and o_end is not None: # [cite: 59]
-                calculated_miles = round(o_end - o_start, 1) # [cite: 59]
+            if o_start is not None and o_end is None: 
+                o_end = round(o_start + calculated_miles, 1) 
+            elif o_end is not None and o_start is None: 
+                st_val = round(o_end - calculated_miles, 1)
+                o_start = max(0.0, st_val)
+            elif o_start is not None and o_end is not None: 
+                calculated_miles = round(o_end - o_start, 1) 
             else:
-                o_start, o_end = 0.0, round(calculated_miles, 1) # [cite: 59, 60]
+                o_start, o_end = 0.0, round(calculated_miles, 1) 
 
-            new_entry = {
-                "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date), # [cite: 60]
-                "Starting Location": start_loc, # [cite: 60]
-                "Destination": combined_destination, # [cite: 60]
-                "Round Trip": round_trip, # [cite: 60]
-                "Purpose of Travel": purpose, # [cite: 60]
-                "Odometer Start": o_start, # [cite: 60, 61]
-                "Odometer End": o_end, # [cite: 61]
-                "Calculated Mileage": calculated_miles, # [cite: 61]
-                "Program Code": program_code, # [cite: 61]
-                "_source_file": "manual_entry" # [cite: 61]
+            # Instead of appending straight to the log, save to a temporary draft state
+            st.session_state.temp_preview_trip = {
+                "Date": travel_date.strftime("%Y-%m-%d") if isinstance(travel_date, (datetime.date, datetime.datetime)) else str(travel_date), 
+                "Starting Location": start_loc, 
+                "Destination": combined_destination, 
+                "Round Trip": round_trip, 
+                "Purpose of Travel": purpose, 
+                "Odometer Start": o_start, 
+                "Odometer End": o_end, 
+                "Calculated Mileage": calculated_miles, 
+                "Program Code": program_code, 
+                "_source_file": "manual_entry" 
             }
-            st.session_state.mileage_data = pd.concat( # [cite: 61]
-                [st.session_state.mileage_data, pd.DataFrame([new_entry])], # [cite: 61]
-                ignore_index=True # [cite: 61, 62]
-            )
-            
-            st.session_state.form_generation += 1 # [cite: 62]
-            st.session_state.num_stops = 0 # [cite: 62]
-            st.success(f"✅ Added! Distance: {google_miles} miles") # [cite: 62, 63]
-            st.rerun() # [cite: 63]
+            st.rerun()
 
     st.markdown("---")
 
-    # Map details and print view for the current path # [cite: 63]
-    if not st.session_state.mileage_data.empty: # [cite: 63]
-        new_app_entries = st.session_state.mileage_data[ # [cite: 63]
-            ~st.session_state.mileage_data["Starting Location"].str.contains(IMPORT_MARKER, na=False) # [cite: 63, 64]
-        ]
+    # Map details and print view for the calculated draft route
+    if st.session_state.temp_preview_trip is not None: 
+        # Map variables are pulled directly from the current preview draft
+        preview = st.session_state.temp_preview_trip
+        origin = preview["Starting Location"] 
+        raw_destination = str(preview["Destination"]) 
+        clean_destination_chain = raw_destination.replace(" (RT)", "") 
+        all_dest_legs = [leg.strip() for leg in clean_destination_chain.split(" -> ")] 
+        final_destination = all_dest_legs[-1] 
+        intermediate_waypoints = all_dest_legs[:-1] if len(all_dest_legs) > 1 else [] 
+        trip_miles = preview["Calculated Mileage"] 
+        is_round_trip = preview["Round Trip"] == "Yes" 
+        entry_date = preview["Date"] 
+        entry_purpose = preview["Purpose of Travel"] 
 
-        if not new_app_entries.empty: # [cite: 64]
-            last_entry = new_app_entries.iloc[-1] # [cite: 64]
-            origin = last_entry["Starting Location"] # [cite: 64]
-            raw_destination = str(last_entry["Destination"]) # [cite: 64]
-            clean_destination_chain = raw_destination.replace(" (RT)", "") # [cite: 64]
-            all_dest_legs = [leg.strip() for leg in clean_destination_chain.split(" -> ")] # [cite: 64]
-            final_destination = all_dest_legs[-1] # [cite: 64]
-            intermediate_waypoints = all_dest_legs[:-1] if len(all_dest_legs) > 1 else [] # [cite: 64]
-            trip_miles = last_entry["Calculated Mileage"] # [cite: 64]
-            is_round_trip = last_entry["Round Trip"] == "Yes" # [cite: 64]
-            entry_date = last_entry["Date"] # [cite: 64]
-            entry_purpose = last_entry["Purpose of Travel"] # [cite: 64]
+        st.subheader("🗺️ Live Route Preview") 
+        with st.container(border=True): 
+            st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}") 
+            timeline_steps = [f"**{origin}** (Start)->"] 
+            for wp in intermediate_waypoints: 
+                timeline_steps.append(f"`Stop: {wp}`") 
+            timeline_steps.append(f" **{final_destination}** (Destination) | ") 
+            if is_round_trip: 
+                timeline_steps.append(f" **{origin}** (RT)") 
+            st.markdown(" ".join(timeline_steps)) 
 
-            st.subheader("Current Route Detail") # [cite: 64]
-            with st.container(border=True): # [cite: 64, 65]
-                st.markdown(f"**Date of Travel:** `{entry_date}` | **Purpose:** {entry_purpose}") # [cite: 65, 66]
-                timeline_steps = [f"**{origin}** (Start)->"] # [cite: 66]
-                for wp in intermediate_waypoints: # [cite: 66]
-                    timeline_steps.append(f"`Stop: {wp}`") # [cite: 66]
-                timeline_steps.append(f" **{final_destination}** (Destination) | ") # [cite: 66]
-                if is_round_trip: # [cite: 66]
-                    timeline_steps.append(f" **{origin}** (RT)") # [cite: 66, 67]
-                st.markdown(" ".join(timeline_steps)) # [cite: 67]
-
-            col_metric_dist, col_metric_type, col_metric_status = st.columns(3) # [cite: 67]
-            with col_metric_dist: # [cite: 67]
-                st.metric(label="Total Distance", value=f"{trip_miles} mi") # [cite: 67]
-            with col_metric_type: # [cite: 67]
-                st.metric(label="Trip Type", value="Round Trip" if is_round_trip else "One Way") # [cite: 67]
-            with col_metric_status: # [cite: 67]
-                st.metric( # [cite: 67]
-                    label="Final Stop", # [cite: 67, 68]
-                    value=final_destination if not is_round_trip else "Returned Back", # [cite: 68]
-                    help="The primary destination point of this recorded log." # [cite: 68]
-                )
-
-            encoded_origin = urllib.parse.quote_plus(origin) # [cite: 68]
-            encoded_final_destination = urllib.parse.quote_plus(final_destination) # [cite: 68]
-            maps_url_legs = [encoded_origin] + [urllib.parse.quote_plus(wp) for wp in intermediate_waypoints] + [encoded_final_destination] # [cite: 68, 69]
-            if is_round_trip: # [cite: 69]
-                maps_url_legs.append(encoded_origin) # [cite: 69]
-                
-            direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/" # [cite: 69]
-
-            if gmaps: # [cite: 69]
-                embed_waypoints = list(intermediate_waypoints) # [cite: 69]
-                if is_round_trip: # [cite: 69]
-                    embed_waypoints.append(final_destination) # [cite: 69, 70]
-                    embed_destination_target = origin # [cite: 70]
-                else:
-                    embed_destination_target = final_destination # [cite: 70]
-                    
-                encoded_embed_waypoints = "|".join([urllib.parse.quote_plus(wp) for wp in embed_waypoints]) # [cite: 70]
-            
-                map_url = ( # [cite: 70, 71]
-                    f"https://www.google.com/maps/embed/v1/directions" # [cite: 71]
-                    f"?key={api_key}" # [cite: 71]
-                    f"&origin={encoded_origin}" # [cite: 71]
-                    f"&destination={urllib.parse.quote_plus(embed_destination_target)}" # [cite: 71]
-                )
-                if encoded_embed_waypoints: # [cite: 71]
-                    map_url += f"&waypoints={encoded_embed_waypoints}" # [cite: 71, 72]
-                st.components.v1.iframe(map_url, width=900, height=500) # [cite: 72]
-            else:
-                st.warning("Please add a valid Google Maps API Key.") # [cite: 72]
-                
-            st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before launching or printing your maps.") # [cite: 72]
-        
-            last_entry_index = new_app_entries.index[-1] # [cite: 72, 73]
-            
-            adjusted_miles = st.number_input( # [cite: 73]
-                "Confirmed Logged Mileage:",
-                min_value=0.0,
-                value=float(trip_miles),
-                step=0.1,
-                format="%.1f",
-                key=f"map_override_{last_entry_index}" # [cite: 73, 74]
+        col_metric_dist, col_metric_type, col_metric_status = st.columns(3) 
+        with col_metric_dist: 
+            st.metric(label="Calculated Distance", value=f"{trip_miles} mi") 
+        with col_metric_type: 
+            st.metric(label="Trip Type", value="Round Trip" if is_round_trip else "One Way") 
+        with col_metric_status: 
+            st.metric( 
+                label="Final Stop", 
+                value=final_destination if not is_round_trip else "Returned Back", 
+                help="The primary destination point of this recorded log." 
             )
-            if adjusted_miles != float(trip_miles): # [cite: 74]
-                st.session_state.mileage_data.at[last_entry_index, "Calculated Mileage"] = round(adjusted_miles, 1) # [cite: 74]
-                
-                raw_start = st.session_state.mileage_data.at[last_entry_index, "Odometer Start"] # [cite: 74]
-                raw_end = st.session_state.mileage_data.at[last_entry_index, "Odometer End"] # [cite: 74, 75]
-                
-                odo_start = float(raw_start or 0.0) # [cite: 75]
-                odo_end = float(raw_end or 0.0) # [cite: 75]
-                
-                start_is_whole = odo_start.is_integer() # [cite: 75, 76]
-                end_is_whole = odo_end.is_integer() # [cite: 76]
-                
-                if start_is_whole and not end_is_whole: # [cite: 76]
-                    st.session_state.mileage_data.at[last_entry_index, "Odometer End"] = round(odo_start + adjusted_miles, 1) # [cite: 76, 77]
-                elif end_is_whole and not start_is_whole: # [cite: 77]
-                    st.session_state.mileage_data.at[last_entry_index, "Odometer Start"] = round(max(0.0, odo_end - adjusted_miles), 1) # [cite: 77, 78]
-                else:
-                    st.session_state.mileage_data.at[last_entry_index, "Odometer End"] = round(odo_start + adjusted_miles, 1) # [cite: 78]
-                 
-                st.rerun() # [cite: 78, 79]
+
+        encoded_origin = urllib.parse.quote_plus(origin) 
+        encoded_final_destination = urllib.parse.quote_plus(final_destination) 
+        maps_url_legs = [encoded_origin] + [urllib.parse.quote_plus(wp) for wp in intermediate_waypoints] + [encoded_final_destination] 
+        if is_round_trip: 
+            maps_url_legs.append(encoded_origin) 
             
-            st.markdown("##### Actions") # [cite: 79]
-            col_copy, col_print = st.columns(2) # [cite: 79]
+        direct_maps_url = f"https://www.google.com/maps/dir/{'/'.join(maps_url_legs)}/" 
 
-            with col_copy:
-                raw_name = st.session_state.get("employee_name", "") # [cite: 79]
-                name_parts = raw_name.split() # [cite: 79, 80]
-                initials = "".join([part[0].upper() for part in name_parts if part]) # [cite: 80]
-                initials_suffix = f" | Initials: {initials}" if initials else "" # [cite: 80, 81]
-                text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}{initials_suffix}" # [cite: 81, 82]
-                st.code(text_to_copy, language="text") # [cite: 82]
-                st.caption("📋 Click the copy icon to save trip details") # [cite: 82]
-                    
-            with col_print:
-                st.link_button( # [cite: 82]
-                    "🔗 Open in Google Maps",
-                    direct_maps_url, # [cite: 82, 83]
-                    type="primary",
-                    use_container_width=True
-                )
-                st.caption("press **Ctrl+P** to print out the Map Route") # [cite: 83]
+        if gmaps: 
+            embed_waypoints = list(intermediate_waypoints) 
+            if is_round_trip: 
+                embed_waypoints.append(final_destination) 
+                embed_destination_target = origin 
+            else: 
+                embed_destination_target = final_destination 
+                
+            encoded_embed_waypoints = "|".join([urllib.parse.quote_plus(wp) for wp in embed_waypoints]) 
+        
+            map_url = ( 
+                f"https://www.google.com/maps/embed/v1/directions" 
+                f"?key={api_key}" 
+                f"&origin={encoded_origin}" 
+                f"&destination={urllib.parse.quote_plus(embed_destination_target)}" 
+            )
+            if encoded_embed_waypoints: 
+                map_url += f"&waypoints={encoded_embed_waypoints}" 
+            st.components.v1.iframe(map_url, width=900, height=500) 
         else:
-            st.info("Sheet template journeys are uploaded. Add a new manual entry above to view the map.") # [cite: 83, 84]
-    else:
-        st.write("Add an entry above to generate a live map route.") # [cite: 84]
+            st.warning("Please add a valid Google Maps API Key.") 
+            
+        st.caption("**Check the miles:** If the map above shows a different total than the calculation, adjust it below before submitting.") 
+    
+        adjusted_miles = st.number_input( 
+            "Confirm/Override Mileage:",
+            min_value=0.0,
+            value=float(trip_miles),
+            step=0.1,
+            format="%.1f",
+            key="preview_override_input"
+        )
+        if adjusted_miles != float(trip_miles): 
+            st.session_state.temp_preview_trip["Calculated Mileage"] = round(adjusted_miles, 1) 
+            
+            odo_start = float(preview["Odometer Start"] or 0.0) 
+            odo_end = float(preview["Odometer End"] or 0.0) 
+            
+            start_is_whole = odo_start.is_integer() 
+            end_is_whole = odo_end.is_integer() 
+            
+            if start_is_whole and not end_is_whole: 
+                st.session_state.temp_preview_trip["Odometer End"] = round(odo_start + adjusted_miles, 1) 
+            elif end_is_whole and not start_is_whole: 
+                st.session_state.temp_preview_trip["Odometer Start"] = round(max(0.0, odo_end - adjusted_miles), 1) 
+            else: 
+                st.session_state.temp_preview_trip["Odometer End"] = round(odo_start + adjusted_miles, 1) 
+             
+            st.rerun() 
+        
+        st.markdown("##### Actions") 
+        col_copy, col_print = st.columns(2)
 
+        with col_copy:
+            raw_name = st.session_state.get("employee_name", "") 
+            name_parts = raw_name.split() 
+            initials = "".join([part[0].upper() for part in name_parts if part]) 
+            initials_suffix = f" | Initials: {initials}" if initials else "" 
+            text_to_copy = f"Date: {entry_date} | Purpose: {entry_purpose} | Miles: {adjusted_miles}{initials_suffix}" 
+            st.code(text_to_copy, language="text") 
+            st.caption("📋 Click the copy icon to save trip details") 
+                
+        with col_print:
+            st.link_button( 
+                "🔗 Open in Google Maps",
+                direct_maps_url, 
+                type="secondary",
+                use_container_width=True
+            )
+            st.caption("press **Ctrl+P** to print out the Map Route") 
+
+        # BUTTON 2: SUBMIT TRIP (Appends to database & advances wizard state)
+        st.write(" ")
+        submit_log_btn = st.button("🎯 Submit Trip to Log & Continue", type="primary", use_container_width=True)
+        if submit_log_btn:
+            st.session_state.mileage_data = pd.concat(
+                [st.session_state.mileage_data, pd.DataFrame([st.session_state.temp_preview_trip])],
+                ignore_index=True
+            )
+            st.session_state.temp_preview_trip = None
+            st.session_state.form_generation += 1 
+            st.session_state.num_stops = 0 
+            st.toast("✅ Trip successfully added to your final log!")
+            go_to_step(4)  # Take them automatically to Step 4 to review and export!
+
+    else:
+        st.info("💡 Fill out the form fields above and click 'Calculate & Preview Route' to generate your route map.")
+
+    # Bottom Step Navigation
+    st.markdown("---")
+    col_back, col_next_fallback = st.columns(2)
+    with col_back:
+        st.button("⬅️ Back to Cover Sheet", on_click=go_to_step, args=(2,), use_container_width=True)
+    with col_next_fallback:
+        st.button("Skip to Review & Export ➡️", on_click=go_to_step, args=(4,), use_container_width=True)
 # ==========================================
 # STEP 4: MILEAGE LOG TABLE & EXPORT BACK TO EXCEL
 # ==========================================
